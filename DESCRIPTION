@@ -1,0 +1,18 @@
+Package: mixlm
+Type: Package
+Title: Mixed model ANOVA and statistics for education
+Version: 1.0.0
+Date: 2014-02-20
+Author: Kristian Hovde Liland, Solve Sæbø
+Maintainer: Kristian Hovde Liland <kristian.liland@nmbu.no>
+Encoding: latin1
+Description: The main functions mask call to mixed models by least squares or REML by adding r() function to formulas of lm and glm. It also has a collection of text book statistics for higher education.
+Depends: multcomp, pls
+Imports: leaps, lme4, car
+License: GPL
+LazyLoad: yes
+LazyData: yes
+Packaged: 2014-02-20 21:17:23 UTC; kristl
+NeedsCompilation: no
+Repository: CRAN
+Date/Publication: 2014-02-20 22:40:54

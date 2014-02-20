@@ -1,0 +1,9 @@
+# import(stats, car, lme4, multcomp, MASS, pls)
+importFrom(leaps, regsubsets)
+# import(pls)
+import(lme4)
+import(car)
+importFrom(pls,plsr)
+importFrom(multcomp,glht)
+exportPattern("^[[:alpha:]]+") 
+

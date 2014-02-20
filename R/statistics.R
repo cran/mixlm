@@ -1,0 +1,1655 @@
+# $Id: statistics.R 38 2014-02-18 21:41:43Z khliland $
+
+##################################
+# Stepwise forward/backward
+stepWise <- function(model, alpha.enter=0.15, alpha.remove=0.15, full=FALSE){
+	# NB! The consistency of hiearchy is somewhat unclear in this method
+	#     as add() and drop() work differently in this respect.
+	cat("Stepwise regression (forward-backward), alpha-to-enter: ", alpha.enter, ", alpha-to-remove: ", alpha.remove, "\n\nFull model: ", sep="")
+	full.formula <- as.formula(model$call$formula)        # Formula for full model
+	print(full.formula)
+	cat("\n")
+	current.formula <- update(full.formula, ~ 1)          # Response against intercept formula
+	current.model <- update(model, current.formula)       # ---------- || -----------  model
+	n.effects <- length(attr(terms(model),"term.labels")) # Number of possible extra regressors
+	n.obs <- length(model$residuals)
+	S2 <- sum(model$residuals^2)/(n.obs-length(model$coefficients)) # Sum of squares for full model
+	the.summary <- 'No iterations performed (re-run using extended output for details)'
+	F <- 0
+	i <- 1
+	while(F<alpha.enter && n.effects>0){ # Add variables while extra regressors contribute
+		added <- add1(current.model, full.formula, test="F") # All possible extended models
+		F.added <- added[,6]            # p values of F statistic
+		F <- min(F.added, na.rm = TRUE) # Minimum of p values
+		n <- which(F.added == F)-1      # Number of best extra regressor
+		if(full){ # Extended output
+			cat("--= Step (forward)", i, "=--", "\n", sep=" ")
+			print(added)
+			cat("\n\n")}
+		if(F<alpha.enter){
+			current.formula <- update(current.formula, paste("~.+",rownames(added[n+1,,drop=FALSE]),sep="")) # Add extra regressor to formula
+			current.model <- update(current.model, current.formula) # Update model with extra regressor
+			n.effects <- n.effects - 1
+			if(!full){
+				p <- length(current.model$coefficients)
+				if(i==1){ # Add current update to the final summary
+					the.summary <- cbind(Step=1, InOut=1, added[n+1,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, added[n+1,5:6])
+				} else{
+					the.summary <- rbind(the.summary,cbind(Step=i, InOut=1, added[n+1,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, added[n+1,5:6]))}}
+			i <- i+1
+			
+
+			# Remove extra regressors
+			removed <- drop1(current.model, test="F")
+			F.removed <- removed[,6]            # p values of F statistic
+			F.r <- max(F.removed, na.rm = TRUE) # Maximum of p values
+			n.r <- which(F.removed == F.r)-1    # Number of best removed regressor
+			if(F.r>alpha.remove){
+				current.formula <- update(current.formula, paste("~.-",rownames(removed[n.r+1,,drop=FALSE]),sep="")) # Add extra regressor to formula
+				current.model <- update(current.model, current.formula) # Update model with extra regressor
+				F <- 0
+				if(!full){ # Add current update to the final summary
+					p <- length(current.model$coefficients)
+					if(i==1){
+						the.summary <- cbind(Step=1, InOut=-1, removed[n.r+1,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, removed[n.r+1,5:6])}
+					else{
+						the.summary <- rbind(the.summary,cbind(Step=i, InOut=-1, removed[n.r+1,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, removed[n.r+1,5:6]))
+						}
+				} else {
+					cat("--= Step (backward)", i, "=--", "\n", sep=" ")
+					print(removed)
+					cat("\n\n")
+				}
+				i <- i+1
+			}
+		}		
+	}
+	if(!full){
+		if(i == 1){
+			print(the.summary)}
+		else {
+			printCoefmat(the.summary,cs.ind=NULL)}}
+	return(current.model)
+}
+
+
+##################################
+# Stepwise backward/forward
+stepWiseBack <- function(model, alpha.remove=0.15, alpha.enter=0.15, full=FALSE){
+	cat("Stepwise regression (backward-forward), alpha-to-remove: ", alpha.remove, ", alpha-to-enter: ", alpha.enter, "\n\nFull model: ", sep="")
+	full.formula <- as.formula(model$call$formula)        # Formula for full model
+	print(full.formula)
+	cat("\n")
+	current.formula <- full.formula                       # Response against intercept formula
+	current.model <- model						          # ---------- || -----------  model
+	n.effects <- length(attr(terms(model),"term.labels")) # Number of possible regressors
+	the.summary <- 'No iterations performed (re-run using extended output for details)'
+	n.obs <- length(model$residuals)
+	S2 <- sum(model$residuals^2)/(n.obs-length(model$coefficients)) # Sum of squares for full model
+	F <- 1
+	i <- 1
+	while(F>alpha.remove && n.effects>0){ # Remove variables while some included regressor does not contribute
+		removed <- drop1(current.model, test="F") # All possible reduced models
+		F.removed <- removed[,6]          # p values of F statistic
+		F <- max(F.removed, na.rm = TRUE) # Minimum of p values
+		n <- which(F.removed == F)-1      # Number of best worst regressor
+		if(full){ # Extended output
+			cat("--= Step (backward)", i, "=--", "\n", sep=" ")
+			print(removed)
+			cat("\n\n")}
+		if(F>alpha.remove){
+			current.formula <- update(current.formula, paste("~.-",rownames(removed[n+1,,drop=FALSE]),sep="")) # Remove regressor from formula
+			current.model <- update(current.model, current.formula) # Update model with extra regressor
+			n.effects <- n.effects - 1
+			if(!full){ # Add current update to the final summary
+				p <- length(current.model$coefficients)
+				if(i==1){
+					the.summary <- cbind(Step=1, InOut=-1, removed[n+1,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, removed[n+1,5:6])}
+				else{
+					the.summary <- rbind(the.summary,cbind(Step=i, InOut=-1, removed[n+1,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, removed[n+1,5:6]))}}
+			i <- i+1
+
+			# Add extra regressors
+			added <- add1(current.model, full.formula, test="F")
+			F.added <- added[,6]              # p values of F statistic
+			F.a <- min(F.added, na.rm = TRUE) # Maximum of p values
+			n.a <- which(F.added == F.a)-1    # Number of best added regressor
+			if(F.a<alpha.enter){
+				current.formula <- update(current.formula, paste("~.+",rownames(added[n.a+1,,drop=FALSE]),sep="")) # Add extra regressor to formula
+				current.model <- update(current.model, current.formula) # Update model with extra regressor
+				F <- 0
+				if(!full){ # Add current update to the final summary
+					p <- length(current.model$coefficients)
+					if(i==1){
+						the.summary <- cbind(Step=1, InOut=1, added[n.a+1,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, added[n.a+1,5:6])}
+					else{
+						the.summary <- rbind(the.summary,cbind(Step=i, InOut=1, added[n.a+1,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, added[n.a+1,5:6]))}}
+			else {
+				cat("--= Step (forward)", i, "=--", "\n", sep=" ")
+				print(added)
+				cat("\n\n")}
+				i <- i+1
+			}
+		}		
+	}
+	if(!full){
+		if(i == 1){
+			print(the.summary)}
+		else {
+			printCoefmat(the.summary,cs.ind=NULL)}}
+	return(current.model)
+}
+
+
+##################################
+## Best subsets
+best.subsets <- function(model, nbest=5, nvmax, digits, force.in='NULL'){
+	if(missing(nvmax)){
+		nvmax <- length(attr(terms(model),"term.labels")) # Number of possible regressors
+	}
+	full.formula <- as.formula(model$call$formula)        # Formula for full model
+	current.data <- model$call$data
+	subsets <- eval(parse(text = paste("regsubsets(full.formula, data=", current.data, ", nbest=nbest, nvmax=nvmax, force.in=",force.in,")")))
+	ss <- summary(subsets)
+	if(missing(digits)){
+		with(ss,print(data.frame(outmat,RSS=rss,R2=rsq,R2adj=adjr2,Cp=cp)))
+	} else {
+		with(ss,print(format(data.frame(outmat,RSS=rss,R2=rsq,R2adj=adjr2,Cp=cp), digits=digits)))
+	}
+}
+
+
+##################################
+# Forward addition
+forward <- function(model, alpha=0.2, full=FALSE, force.in=NULL){
+	cat("Forward selection, alpha-to-enter: ", alpha, "\n\nFull model: ", sep="")
+	full.formula <- as.formula(model$call$formula)       # Formula for full model
+	print(full.formula)
+	cat("\n")
+	if(is.null(force.in)){
+		current.formula <- update(full.formula, ~ 1)         # Response against intercept formula
+	} else {
+		current.formula <- update(full.formula, paste('~',force.in, sep=""))}         # Response against intercept formula
+	current.model <- update(model, current.formula)      # ---------- || -----------  model
+	possible.effects <- attr(terms(model),"term.labels") # Vector of possible extra regressors
+	the.summary <- 'No iterations performed (re-run using extended output for details)'
+	n.obs <- length(model$residuals)
+	S2 <- sum(model$residuals^2)/(n.obs-length(model$coefficients)) # Sum of squares for full model.
+	F <- 0
+	i <- 1
+	the.summary <- NULL
+	while(F<alpha && length(possible.effects)>0){ # Add variables while extra regressors contribute
+		added <- add1(current.model, full.formula, test="F") # All possible extended models
+		F.added <- added[,6]            # p values of F statistic
+		F <- min(F.added, na.rm = TRUE) # Minimum of p values
+		n <- which(F.added == F)      # Number of best extra regressor
+		if(full){ # Extended output
+			cat("--= Step", i, "=--", "\n", sep=" ")
+			print(added)
+			cat("\n\n")}
+		if(F<alpha){
+			current.formula <- update(current.formula, paste("~.+",attr(added,"row.names")[n],sep="")) # Add extra regressor to formula
+			current.model <- update(current.model, current.formula) # Update model with extra regressor
+			possible.effects <- possible.effects[-(n-1)]                # Remove extra regressor from possible regressors
+			if(!full){ # Add current update to the final summary
+				p <- length(current.model$coefficients)
+				if(i==1){
+					the.summary <- cbind(Step=1, added[n,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, added[n,5:6])}
+				else{
+					the.summary <- rbind(the.summary,cbind(Step=i, added[n,3:4], R2pred=R2pred(current.model), Cp=sum(current.model$residuals^2)/S2-n.obs+2*p, added[n,5:6]))}}
+			i <- i+1
+		}
+	}
+	if(!full){
+		if(i == 1){
+			print(the.summary)}
+		else {
+			printCoefmat(the.summary,cs.ind=NULL)}}
+	return(current.model)
+}
+
+
+##################################
+# Backward elimination
+backward <- function(model, alpha=0.2, full=FALSE, hierarchy=TRUE, force.in=NULL){
+	cat("Backward elimination, alpha-to-remove: ", alpha, "\n\nFull model: ", sep="")
+	current.dropable <- current.formula <- as.formula(model$call$formula)    # Formula for full model
+	print(current.formula)
+	if(is.null(force.in)){
+		possible.effects <- attr(terms(model),"term.labels") # Vector of possible removed regressors
+	} else {
+		current.dropable <- update(current.formula, paste("~.-", paste(force.in, collapse="-"), sep=""))
+		possible.effects <- setdiff(attr(terms(model),"term.labels"), force.in)} # Vector of possible removed regressors
+	cat("\n")
+	n.obs <- length(model$residuals)
+	S2 <- sum(model$residuals^2)/(n.obs-length(model$coefficients)) # Sum of squares for full model
+	the.summary <- 'No iterations performed (re-run using extended output for details)'
+	F <- Inf
+	i <- 1
+	while(F>alpha && length(possible.effects)>0){ # Remove variables until all regressor contributes
+		if(hierarchy){
+			removed <- drop1(model, setdiff(drop.scope(model),ifelse(is.null(force.in),"",strsplit(force.in,"\\+")[[1]])), test="F")} # All possible extended models
+		else{
+			removed <- drop1(model, current.dropable, test="F")} # All possible extended models
+		F.removed <- removed[,6]          # p values of F statistic
+		F <- max(F.removed, na.rm = TRUE) # Maximum of p values
+		n <- which(F.removed == F)-1  # Number of best removed regressor
+		if(full){ # Extended output
+			cat("--= Step", i, "=--", "\n", sep=" ")
+			print(removed)
+			cat("\n\n")}
+		if(F>alpha){
+			current.formula  <- update(current.formula, paste("~.-",attr(removed,"row.names")[n+1],sep="")) # Remove regressor from formula
+			current.dropable <- update(current.dropable, paste("~.-",attr(removed,"row.names")[n+1],sep="")) # Remove regressor from dropable
+			model <- update(model, current.formula)  # Update model without removed regressor
+			possible.effects <- possible.effects[-n] # Remove removed regressor from possible regressors
+			if(!full){ # Add current update to the final summary
+				p <- length(model$coefficients)
+				if(i==1){
+					the.summary <- cbind(Step=1, removed[n+1,3:4], R2pred=R2pred(model), Cp=sum(model$residuals^2)/S2-n.obs+2*p, removed[n+1,5:6])}
+				else{
+					the.summary <- rbind(the.summary,cbind(Step=i, removed[n+1,3:4], R2pred=R2pred(model), Cp=sum(model$residuals^2)/S2-n.obs+2*p, removed[n+1,5:6]))}}
+			i <- i+1
+		}
+	}
+	if(!full){
+		if(i == 1){
+			print(the.summary)}
+		else {
+			printCoefmat(the.summary,cs.ind=NULL)}}
+	return(model)
+}
+
+
+#######################
+## PRESS statistics
+PRESS.res <- function(object=NULL) {
+	if(is.null(object) && "package:Rcmdr"%in%search()){
+		try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
+	}
+	residuals(object)/(1-lm.influence(object)$hat)
+}
+PRESS.pred <- function(object=NULL) {
+	if(is.null(object)){
+		try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
+	}
+	model.response(model.frame(object)) - residuals(object)/(1-lm.influence(object)$hat)
+}
+PRESS <- function(object=NULL) {
+	if(is.null(object) && "package:Rcmdr"%in%search()){
+		try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
+	}
+	the.PRESS <- NULL
+	if(class(object)=="mvr"){ # PCR/PLSR
+		temp.model <- object
+		hasVal <- !is.null(temp.model$validation)
+		hasLOO <- logical(0)
+		if(hasVal){ # Check if validated
+			hasLOO <- attr(temp.model$validation$segments, 'type')=='leave-one-out'
+		}
+		if(length(hasLOO)!=1 || hasLOO==FALSE){ # Wrong/no cross-validation
+			temp.model <- update(temp.model,validation="LOO")
+		}
+		n <- dim(temp.model$scores)[1]
+		comp0 <- temp.model$validation$PRESS0; names(comp0) <- "(intercept)"
+		the.PRESS <- c(comp0,temp.model$validation$PRESS[1,])
+	}
+	if(class(object)=="lm"){ # Linear regression
+		the.PRESS <- sum(residuals(object)^2/(1-lm.influence(object)$hat)^2)
+	}
+	the.PRESS
+}
+R2pred <- function(object=NULL) {
+	if(is.null(object) && "package:Rcmdr"%in%search()){
+		try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
+	}
+	R2pred <- NULL
+	if(class(object)=="mvr"){ # PCR/PLSR
+		temp.model <- object
+		hasVal <- !is.null(temp.model$validation)
+		hasLOO <- logical(0)
+		if(hasVal){ # Check if validated
+			hasLOO <- attr(temp.model$validation$segments, 'type')=='leave-one-out'
+		}
+		if(length(hasLOO)!=1 || hasLOO==FALSE){ # Wrong/no cross-validation
+			temp.model <- update(temp.model,validation="LOO")
+		}
+		n <- dim(temp.model$scores)[1]
+		comp0 <- temp.model$validation$PRESS0; names(comp0) <- "(intercept)"
+		R2pred <- 1-c(comp0,temp.model$validation$PRESS[1,])/((n-1)*var(temp.model$model[,1]))
+	}
+	if(class(object)=="lm"){ # Linear regression
+		R2pred <- 1 - sum(residuals(object)^2/(1-lm.influence(object)$hat)^2) /
+			(var(object$model[,1])*(length(object$model[,1])-1))
+	}
+	R2pred
+}
+
+
+####################
+## Confusion matrix
+confusion <- function(true, predicted){
+	n.lev <- length(levels(predicted))
+	a <- table(Predicted=predicted,True=true)
+	b <- rbind(a,Total=apply(a,2,sum),Correct=diag(a),Proportion=diag(a)/apply(a,2,sum))
+	aa <- dimnames(a)
+	aa$Predicted <- c(aa$Predicted,"Total","Correct","Proportion")
+	dimnames(b) <- aa 
+	print(b[-(n.lev+3),])
+	cat("\nProportions correct\n")
+	print(b[n.lev+3,])
+	cat(paste('\nN correct/N total = ', sum(b[n.lev+2,]), '/', sum(b[n.lev+1,]), ' = ', format(sum(b[n.lev+2,])/sum(b[n.lev+1,])), '\n', sep=''))
+}
+
+
+#################################
+# ANOVA for regression
+anova_reg <- function(lm.object){
+	anova.result <- anova(lm.object)
+	p <- dim(anova.result)[1]
+	new.anova <- anova.result[c(1,p),]
+	new.anova[1,1] <- sum(anova.result[1:(p-1),1])
+	new.anova[1,2] <- sum(anova.result[1:(p-1),2])
+	new.anova[1,3] <- new.anova[1,2]/new.anova[1,1]
+	new.anova[1,4] <- new.anova[1,3]/new.anova[2,3]
+	new.anova[1,5] <- pf(new.anova[1,4], new.anova[1,1], new.anova[2,1], lower.tail=FALSE)
+	if(p>2)
+		rownames(new.anova)[1] <- "Regression"
+	attributes(new.anova)$heading <- "Analysis of Variance Table"
+	new.anova
+}
+
+
+################################
+# RMSEP for lm and mvr
+RMSEP <- function(object){
+	if(is.null(object) && "package:Rcmdr"%in%search()){
+		try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
+	}
+	the.RMSEP <- NULL
+	if(class(object)=="mvr"){ # PCR/PLSR
+		the.RMSEP <- pls::RMSEP(object, estimate="all")
+	}
+	if(class(object)=="lm"){ # Linear regression
+		the.RMSEP <- sqrt(mean(residuals(object)^2/(1-lm.influence(object)$hat)^2))
+	}
+	the.RMSEP
+}
+
+
+################################
+# One sample proportion test
+prop.test.ordinary <- function (x, n, p = NULL, alternative = c("two.sided", "less", 
+    "greater"), conf.level = 0.95, correct = TRUE, pooled=TRUE)
+{
+    DNAME <- deparse(substitute(x))
+    if (is.table(x) && length(dim(x)) == 1L) {
+        if (dim(x) != 2L) 
+            stop("table 'x' should have 2 entries")
+        l <- 1
+        n <- sum(x)
+        x <- x[1L]
+    }
+    else if (is.matrix(x)) {
+        if (ncol(x) != 2L) 
+            stop("'x' must have 2 columns")
+        l <- nrow(x)
+        n <- rowSums(x)
+        x <- x[, 1L]
+    }
+    else {
+        DNAME <- paste(DNAME, "out of", deparse(substitute(n)))
+        if ((l <- length(x)) != length(n)) 
+            stop("'x' and 'n' must have the same length")
+    }
+    OK <- complete.cases(x, n)
+    x <- x[OK]
+    n <- n[OK]
+    if ((k <- length(x)) < 1L) 
+        stop("not enough data")
+    if (any(n <= 0)) 
+        stop("elements of 'n' must be positive")
+    if (any(x < 0)) 
+        stop("elements of 'x' must be nonnegative")
+    if (any(x > n)) 
+        stop("elements of 'x' must not be greater than those of 'n'")
+    if (is.null(p) && (k == 1)) 
+        p <- 0.5
+    if (!is.null(p)) {
+        DNAME <- paste(DNAME, ", null ", ifelse(k == 1, "probability ", 
+            "probabilities "), deparse(substitute(p)), sep = "")
+        if (length(p) != l) 
+            stop("'p' must have the same length as 'x' and 'n'")
+        p <- p[OK]
+        if (any((p <= 0) | (p >= 1))) 
+            stop("elements of 'p' must be in (0,1)")
+    }
+    alternative <- match.arg(alternative)
+    if (k > 2 || (k == 2) && !is.null(p)) 
+        alternative <- "two.sided"
+    if ((length(conf.level) != 1L) || is.na(conf.level) || (conf.level <= 
+        0) || (conf.level >= 1)) 
+        stop("'conf.level' must be a single number between 0 and 1")
+    correct <- as.logical(correct)
+    ESTIMATE <- x/n
+    names(ESTIMATE) <- if (k == 1) 
+        "p"
+    else paste("prop", 1L:l)[OK]
+    NVAL <- p
+    CINT <- NULL
+    YATES <- ifelse(correct && (k <= 2), 0.5, 0)
+    if (k == 1) {
+        z <- ifelse(alternative == "two.sided", qnorm((1 + conf.level)/2), 
+            qnorm(conf.level))
+        YATES <- min(YATES, abs(x - n * p))
+        p.c <- ESTIMATE + YATES/n
+        p.u <- if (p.c >= 1) 
+            1
+        else (p.c + z * sqrt(p.c * (1 - p.c)/n))
+        p.c <- ESTIMATE - YATES/n
+        p.l <- if (p.c <= 0) 
+            0
+        else (p.c - z * sqrt(p.c * (1 - p.c)/n))
+        CINT <- switch(alternative, two.sided = c(max(p.l, 0), 
+            min(p.u, 1)), greater = c(max(p.l, 0), 1), less = c(0, 
+            min(p.u, 1)))
+    }
+    else if ((k == 2) & is.null(p)) {
+        DELTA <- ESTIMATE[1L] - ESTIMATE[2L]
+        YATES <- min(YATES, abs(DELTA)/sum(1/n))
+        WIDTH <- (switch(alternative, two.sided = qnorm((1 + 
+            conf.level)/2), qnorm(conf.level)) * sqrt(sum(ESTIMATE * 
+            (1 - ESTIMATE)/n)) + YATES * sum(1/n))
+        CINT <- switch(alternative, two.sided = c(max(DELTA - 
+            WIDTH, -1), min(DELTA + WIDTH, 1)), greater = c(max(DELTA - 
+            WIDTH, -1), 1), less = c(-1, min(DELTA + WIDTH, 1)))
+    }
+    if (!is.null(CINT)) 
+        attr(CINT, "conf.level") <- conf.level
+    METHOD <- paste(ifelse(k == 1, "1-sample proportions test", 
+        paste(k, "-sample test for ", ifelse(is.null(p), "equality of", 
+            "given"), " proportions", sep = "")), ifelse(YATES, 
+        "with", "without"), "continuity correction")
+    if (is.null(p)) {
+        p <- sum(x)/sum(n)
+        PARAMETER <- k - 1
+    }
+    else {
+        PARAMETER <- k
+        names(NVAL) <- names(ESTIMATE)
+    }
+    names(PARAMETER) <- "df"
+	if(k == 1 || pooled == TRUE)
+		x <- cbind(x, n - x)
+    E <- cbind(n * p, n * (1 - p))
+    if (any(E < 5)) 
+        warning("Approximation may be incorrect")
+    STATISTIC <- sum((abs(x - E) - YATES)^2/E)
+	if (k == 1) 
+		z <- sign(ESTIMATE - p) * sqrt(STATISTIC)
+	else { 
+		if(!exists("DELTA"))
+			DELTA <- 1
+		if(pooled)
+			z <- sign(DELTA) * sqrt(STATISTIC)
+		else {
+			p <- x/n
+			z <- sign(DELTA)*(abs(DELTA) + YATES * sum(1/n))/sqrt(sum(p*(1-p)/n))
+			STATISTIC <- z^2
+		}
+	}
+    if (alternative == "two.sided") {
+        PVAL <- pchisq(STATISTIC, PARAMETER, lower.tail = FALSE)
+    } else {
+        PVAL <- pnorm(z, lower.tail = (alternative == "less"))
+    }
+	STATISTIC <- z
+    names(STATISTIC) <- "z"
+	PARAMETER <- Inf
+	names(PARAMETER) <- "df"
+    RVAL <- list(statistic = STATISTIC, parameter = PARAMETER, 
+        p.value = as.numeric(PVAL), estimate = ESTIMATE, null.value = NVAL, 
+        conf.int = CINT, alternative = alternative, method = METHOD, 
+        data.name = DNAME)
+    class(RVAL) <- "htest"
+    return(RVAL)
+}
+
+
+
+################################
+# Standardized Pearson residuals
+spearson <- function(object){
+	residuals(object, type="pearson")/sqrt(1-hatvalues(object))
+}
+
+
+################################
+# Extended summary from multinom
+summaryMultinom <- function(object){
+	M <- summary(object, Wald=TRUE)
+	cat('Call:\n')
+	print(M$call)
+	if(terms(object)[[3]]!=1){
+		A <- Anova(object)}
+	N <- dim(M$Wald.ratios)
+	n <- prod(N)
+	lH <- numeric(n)
+	zeros <- rep(0,n)
+	for(i in 1:n){
+		z.tmp <- zeros
+		z.tmp[i] <- 1
+		lH[i] <- linearHypothesis(object, z.tmp, rhs=0)[2,3]
+	}
+	p.values <- matrix(lH,N[1],N[2],byrow=TRUE)
+	result <- cbind(as.vector(t(M$coefficients)),as.vector(t(M$standard.errors)),as.vector(t(M$Wald.ratios)),as.vector(t(p.values)))
+	colnames(result) <- c('Coef','SE Coef','Z','P')
+	rn <- rownames(M$coefficients)
+	cn <- colnames(M$coefficients)
+	j <- 0
+	for(i in 1:N[1]){
+		R <- result[1:N[2]+j,,drop=FALSE]
+		dimnames(R) <- eval(parse(text=paste("list('", rn[i], "'=c('", paste(cn,collapse="','",sep=""), "'),", "c('Coef','SE Coef','Z','P'))", sep="")))
+		j <- j+N[2]
+		print(R)
+	}
+	cat("\n")
+	if(terms(object)[[3]]!=1){
+		print(A)}
+	cat(paste("\nResidual Deviance: ", round(M$deviance,4), "\n", sep=""))
+	cat(paste("AIC: ", round(M$AIC,4), "\n", sep=""))
+	print(logLik(object))
+}
+
+################################
+# Extended summary from multinom
+extend.colnames <- function(object, the.name){
+	if(is.matrix(object)){
+		colnames(object) <- paste(the.name,colnames(object),sep='.')
+	}
+	object
+}
+
+
+################################
+# Extended summary polr
+summaryOrdinal <- function(object, digits = max(3, .Options$digits - 3),
+                         correlation = FALSE, ...)
+{
+	if(terms(object)[[3]]!=1){
+		A <- Anova(object)}
+	lL <- logLik(object)
+    cc <- c(coef(object), object$zeta)
+    pc <- length(coef(object))
+    q <- length(object$zeta)
+    coef <- matrix(0, pc+q, 4L, dimnames=list(names(cc),
+                               c("  Coef", " SE Coef", "  Z", "  P")))
+    coef[, 1L] <- cc
+    vc <- vcov(object)
+    coef[, 2L] <- sd <- sqrt(diag(vc))
+    coef[, 3L] <- coef[, 1L]/coef[, 2L]
+	coef[, 4L] <- 1-pchisq(coef[, 3L]^2,1)
+    object$coefficients <- coef
+    object$pc <- pc
+    object$digits <- digits
+    if(correlation)
+        object$correlation <- (vc/sd)/rep(sd, rep(pc+q, pc+q))
+    class(object) <- "summary.polr"
+    print(object)
+	print(lL)
+	cat("\n")
+	if(terms(object)[[3]]!=1){
+		print(A)}
+}
+
+
+#####################################
+# z and t tests for summarized data
+z_test_sum <- function(means, sds, ns, alternative = c("two.sided", "less", "greater"),
+         mu = 0, var.equal = FALSE, conf.level = 0.95, z.test=TRUE, ...){
+	t_test_sum(means, sds, ns, alternative,
+         mu, var.equal, conf.level, z.test=TRUE, ...)
+}
+t_test_sum <- function(means, sds, ns, alternative = c("two.sided", "less", "greater"),
+         mu = 0, var.equal = FALSE, conf.level = 0.95, z.test=FALSE, ...)
+{
+    alternative <- match.arg(alternative)
+
+    if(!missing(mu) && (length(mu) != 1 || is.na(mu)))
+        stop("'mu' must be a single number")
+    if(!missing(conf.level) &&
+       (length(conf.level) != 1 || !is.finite(conf.level) ||
+        conf.level < 0 || conf.level > 1))
+        stop("'conf.level' must be a single number between 0 and 1")
+    if( length(means)==2 ) {
+	dname <- "two samples"#paste(deparse(substitute(x)),"and",
+		     #  deparse(substitute(y)))
+    }
+    else {
+	dname <- "one sample" #deparse(substitute(x))
+    }
+    nx <- ns[1]
+    mx <- means[1]
+    vx <- sds[1]^2
+    estimate <- mx
+    if(length(means)==1) {
+        if(nx < 2) stop("not enough 'x' observations")
+		df <- ifelse(z.test,Inf,nx-1)
+		stderr <- sqrt(vx/nx)
+			if(stderr < 10 *.Machine$double.eps * abs(mx))
+				stop("data are essentially constant")
+		tstat <- (mx-mu)/stderr
+		method <- ifelse(z.test,"One Sample z-test","One Sample t-test")
+		names(estimate) <- "mean of x"
+    } else {
+		ny <- ns[2]
+			if(nx < 1 || (!var.equal && nx < 2))
+				stop("not enough 'x' observations")
+		if(ny < 1 || (!var.equal && ny < 2))
+				stop("not enough 'y' observations")
+			if(var.equal && nx+ny < 3) stop("not enough observations")
+		my <- means[2]
+		vy <- sds[2]^2
+		method <- paste(if(!var.equal)"Welch", ifelse(z.test,"Two Sample z-test","Two Sample t-test"))
+		estimate <- c(mx,my)
+		names(estimate) <- c("mean of x","mean of y")
+		if(var.equal) {
+			df <- ifelse(z.test,Inf,nx+ny-2)
+				v <- 0
+				if(nx > 1) v <- v + (nx-1)*vx
+				if(ny > 1) v <- v + (ny-1)*vy
+			v <- v/df
+			stderr <- sqrt(v*(1/nx+1/ny))
+		} else {
+			stderrx <- sqrt(vx/nx)
+			stderry <- sqrt(vy/ny)
+			stderr <- sqrt(stderrx^2 + stderry^2)
+			df <- ifelse(z.test,Inf,stderr^4/(stderrx^4/(nx-1) + stderry^4/(ny-1)))
+		}
+			if(stderr < 10 *.Machine$double.eps * max(abs(mx), abs(my)))
+				stop("data are essentially constant")
+			tstat <- (mx - my - mu)/stderr
+    }
+    if (alternative == "less") {
+	pval <- pt(tstat, df)
+	cint <- c(-Inf, tstat + qt(conf.level, df) )
+    }
+    else if (alternative == "greater") {
+	pval <- pt(tstat, df, lower.tail = FALSE)
+	cint <- c(tstat - qt(conf.level, df), Inf)
+    }
+    else {
+	pval <- 2 * pt(-abs(tstat), df)
+	alpha <- 1 - conf.level
+        cint <- qt(1 - alpha/2, df)
+	cint <- tstat + c(-cint, cint)
+    }
+    cint <- mu + cint * stderr
+    names(tstat) <- ifelse(z.test,"z","t")
+    names(df) <- "df"
+    names(mu) <- if(length(means)==2) "difference in means" else "mean"
+    attr(cint,"conf.level") <- conf.level
+    rval <- list(statistic = tstat, parameter = df, p.value = pval,
+	       conf.int=cint, estimate=estimate, null.value = mu,
+	       alternative=alternative,
+	       method=method, data.name=dname)
+    class(rval) <- "htest"
+    return(rval)
+}
+
+#####################################
+# z tests for ordinary data
+z_test <- function(x, ...) UseMethod("z_test")
+z_test.formula <-
+function(formula, data, subset, na.action, ...)
+{
+    if(missing(formula)
+       || (length(formula) != 3L)
+       || (length(attr(terms(formula[-2L]), "term.labels")) != 1L))
+        stop("'formula' missing or incorrect")
+    m <- match.call(expand.dots = FALSE)
+    if(is.matrix(eval(m$data, parent.frame())))
+        m$data <- as.data.frame(data)
+    m[[1L]] <- as.name("model.frame")
+    m$... <- NULL
+    mf <- eval(m, parent.frame())
+    DNAME <- paste(names(mf), collapse = " by ")
+    names(mf) <- NULL
+    response <- attr(attr(mf, "terms"), "response")
+    g <- factor(mf[[-response]])
+    if(nlevels(g) != 2L)
+        stop("grouping factor must have exactly 2 levels")
+    DATA <- split(mf[[response]], g)
+    names(DATA) <- c("x", "y")
+    y <- do.call("z_test", c(DATA, list(...)))
+    y$data.name <- DNAME
+    if(length(y$estimate) == 2L)
+        names(y$estimate) <- paste("mean in group", levels(g))
+    y
+}
+
+z_test.default <- function(x, y = NULL, alternative = c("two.sided", "less", "greater"),
+         mu = 0, paired = FALSE, var.equal = FALSE, conf.level = 0.95, sds=NULL,
+         ...)
+{
+    z.test <- TRUE
+	alternative <- match.arg(alternative)
+
+    if(!missing(mu) && (length(mu) != 1 || is.na(mu)))
+        stop("'mu' must be a single number")
+    if(!missing(conf.level) &&
+       (length(conf.level) != 1 || !is.finite(conf.level) ||
+        conf.level < 0 || conf.level > 1))
+        stop("'conf.level' must be a single number between 0 and 1")
+    if( !is.null(y) ) {
+		dname <- paste(deparse(substitute(x)),"and",
+				   deparse(substitute(y)))
+		if(paired)
+			xok <- yok <- complete.cases(x,y)
+		else {
+			yok <- !is.na(y)
+			xok <- !is.na(x)
+		}
+		y <- y[yok]
+    }
+    else {
+		dname <- deparse(substitute(x))
+		if( paired ) stop("'y' is missing for paired test")
+		xok <- !is.na(x)
+		yok <- NULL
+    }
+    x <- x[xok]
+    if( paired ) {
+		x <- x-y
+		y <- NULL
+    }
+    nx <- length(x)
+    mx <- mean(x)
+    vx <- ifelse(z.test,sds[1]^2,var(x))
+    estimate <- c(mx,sqrt(vx))
+    if(is.null(y)) {
+        if(nx < 2) stop("not enough 'x' observations")
+		df <- ifelse(z.test,Inf,nx-1)
+		stderr <- sqrt(vx/nx)
+			if(stderr < 10 *.Machine$double.eps * abs(mx))
+				stop("data are essentially constant")
+		tstat <- (mx-mu)/stderr
+		method <- ifelse(paired,ifelse(z.test,"Paired z-test","Paired t-test"),ifelse(z.test,"One Sample z-test","One Sample t-test"))
+		names(estimate) <- c(ifelse(paired,"mean of the differences","mean of x"),ifelse(paired," std.dev. of the differences"," std.dev. of x"))
+	} else {
+		ny <- length(y)
+			if(nx < 1 || (!var.equal && nx < 2))
+				stop("not enough 'x' observations")
+		if(ny < 1 || (!var.equal && ny < 2))
+				stop("not enough 'y' observations")
+			if(var.equal && nx+ny < 3) stop("not enough observations")
+		my <- mean(y)
+		vy <- ifelse(z.test,sds[2]^2,var(y))
+		method <- paste(if(!var.equal)"Welch", ifelse(z.test,"Two Sample z-test","Two Sample t-test"))
+		if(var.equal) {
+			df <- nx+ny-2
+				v <- 0
+				if(nx > 1) v <- v + (nx-1)*vx
+				if(ny > 1) v <- v + (ny-1)*vy
+			v <- v/df
+			stderr <- sqrt(v*(1/nx+1/ny))
+			df <- ifelse(z.test,Inf,nx+ny-2)
+		estimate <- c(mx,my,sqrt(v))
+		names(estimate) <- c("mean of x"," mean of y"," pooled std.dev.")
+		} else {
+			stderrx <- sqrt(vx/nx)
+			stderry <- sqrt(vy/ny)
+			stderr <- sqrt(stderrx^2 + stderry^2)
+			df <- ifelse(z.test,Inf,stderr^4/(stderrx^4/(nx-1) + stderry^4/(ny-1)))
+			estimate <- c(mx,my,sqrt(vx),sqrt(vy))
+			names(estimate) <- c("mean of x"," mean of y", " std.dev. of x", " std.dev. of y")
+		}
+			if(stderr < 10 *.Machine$double.eps * max(abs(mx), abs(my)))
+				stop("data are essentially constant")
+			tstat <- (mx - my - mu)/stderr
+    }
+    if (alternative == "less") {
+		pval <- pt(tstat, df)
+		cint <- c(-Inf, tstat + qt(conf.level, df) )
+    }
+    else if (alternative == "greater") {
+		pval <- pt(tstat, df, lower.tail = FALSE)
+		cint <- c(tstat - qt(conf.level, df), Inf)
+    }
+    else {
+		pval <- 2 * pt(-abs(tstat), df)
+		alpha <- 1 - conf.level
+			cint <- qt(1 - alpha/2, df)
+		cint <- tstat + c(-cint, cint)
+    }
+    cint <- mu + cint * stderr
+    names(tstat) <- ifelse(z.test,"z","t")
+    names(df) <- "df"
+    names(mu) <- if(paired || !is.null(y)) "difference in means" else "mean"
+    attr(cint,"conf.level") <- conf.level
+    rval <- list(statistic = tstat, parameter = df, p.value = pval,
+	       conf.int=cint, estimate=estimate, null.value = mu,
+	       alternative=alternative,
+	       method=method, data.name=dname)
+    class(rval) <- "htest"
+    return(rval)
+}
+
+#####################################
+# t tests for ordinary data (extended output)
+t_test <- function(x, ...) UseMethod("t_test")
+t_test.default <-
+function(x, y = NULL, alternative = c("two.sided", "less", "greater"),
+         mu = 0, paired = FALSE, var.equal = FALSE, conf.level = 0.95,
+         ...)
+{
+    alternative <- match.arg(alternative)
+
+    if(!missing(mu) && (length(mu) != 1 || is.na(mu)))
+        stop("'mu' must be a single number")
+    if(!missing(conf.level) &&
+       (length(conf.level) != 1 || !is.finite(conf.level) ||
+        conf.level < 0 || conf.level > 1))
+        stop("'conf.level' must be a single number between 0 and 1")
+    if( !is.null(y) ) {
+	dname <- paste(deparse(substitute(x)),"and",
+		       deparse(substitute(y)))
+	if(paired)
+	    xok <- yok <- complete.cases(x,y)
+	else {
+	    yok <- !is.na(y)
+	    xok <- !is.na(x)
+	}
+	y <- y[yok]
+    }
+    else {
+	dname <- deparse(substitute(x))
+	if( paired ) stop("'y' is missing for paired test")
+	xok <- !is.na(x)
+	yok <- NULL
+    }
+    x <- x[xok]
+    if( paired ) {
+	x <- x-y
+	y <- NULL
+    }
+    nx <- length(x)
+    mx <- mean(x)
+    vx <- var(x)
+    estimate <- c(mx,sqrt(vx))
+    if(is.null(y)) {
+        if(nx < 2) stop("not enough 'x' observations")
+	df <- nx-1
+	stderr <- sqrt(vx/nx)
+        if(stderr < 10 *.Machine$double.eps * abs(mx))
+            stop("data are essentially constant")
+	tstat <- (mx-mu)/stderr
+	method <- ifelse(paired,"Paired t-test","One Sample t-test")
+	names(estimate) <- c(ifelse(paired,"mean of the differences","mean of x"),ifelse(paired," std.dev. of the differences", " std.dev. of x"))
+    } else {
+	ny <- length(y)
+        if(nx < 1 || (!var.equal && nx < 2))
+            stop("not enough 'x' observations")
+	if(ny < 1 || (!var.equal && ny < 2))
+            stop("not enough 'y' observations")
+        if(var.equal && nx+ny < 3) stop("not enough observations")
+	my <- mean(y)
+	vy <- var(y)
+	method <- paste(if(!var.equal)"Welch", "Two Sample t-test")
+	estimate <- c(mx,my,sqrt(vx),sqrt(vy))
+	names(estimate) <- c("mean of x"," mean of y"," std.dev. of x"," std.dev. of y")
+	if(var.equal) {
+	    df <- nx+ny-2
+            v <- 0
+            if(nx > 1) v <- v + (nx-1)*vx
+            if(ny > 1) v <- v + (ny-1)*vy
+	    v <- v/df
+	    stderr <- sqrt(v*(1/nx+1/ny))
+		estimate <- c(mx,my,sqrt(v))
+		names(estimate) <- c("mean of x"," mean of y"," pooled std.dev.")
+	} else {
+	    stderrx <- sqrt(vx/nx)
+	    stderry <- sqrt(vy/ny)
+	    stderr <- sqrt(stderrx^2 + stderry^2)
+	    df <- stderr^4/(stderrx^4/(nx-1) + stderry^4/(ny-1))
+	}
+        if(stderr < 10 *.Machine$double.eps * max(abs(mx), abs(my)))
+            stop("data are essentially constant")
+        tstat <- (mx - my - mu)/stderr
+    }
+    if (alternative == "less") {
+	pval <- pt(tstat, df)
+	cint <- c(-Inf, tstat + qt(conf.level, df) )
+    }
+    else if (alternative == "greater") {
+	pval <- pt(tstat, df, lower.tail = FALSE)
+	cint <- c(tstat - qt(conf.level, df), Inf)
+    }
+    else {
+	pval <- 2 * pt(-abs(tstat), df)
+	alpha <- 1 - conf.level
+        cint <- qt(1 - alpha/2, df)
+	cint <- tstat + c(-cint, cint)
+    }
+    cint <- mu + cint * stderr
+    names(tstat) <- "t"
+    names(df) <- "df"
+    names(mu) <- if(paired || !is.null(y)) "difference in means" else "mean"
+    attr(cint,"conf.level") <- conf.level
+    rval <- list(statistic = tstat, parameter = df, p.value = pval,
+	       conf.int=cint, estimate=estimate, null.value = mu,
+	       alternative=alternative,
+	       method=method, data.name=dname)
+    class(rval) <- "htest"
+    return(rval)
+}
+
+t_test.formula <-
+function(formula, data, subset, na.action, ...)
+{
+    if(missing(formula)
+       || (length(formula) != 3L)
+       || (length(attr(terms(formula[-2L]), "term.labels")) != 1L))
+        stop("'formula' missing or incorrect")
+    m <- match.call(expand.dots = FALSE)
+    if(is.matrix(eval(m$data, parent.frame())))
+        m$data <- as.data.frame(data)
+    m[[1L]] <- as.name("model.frame")
+    m$... <- NULL
+    mf <- eval(m, parent.frame())
+    DNAME <- paste(names(mf), collapse = " by ")
+    names(mf) <- NULL
+    response <- attr(attr(mf, "terms"), "response")
+    g <- factor(mf[[-response]])
+    if(nlevels(g) != 2L)
+        stop("grouping factor must have exactly 2 levels")
+    DATA <- split(mf[[response]], g)
+    names(DATA) <- c("x", "y")
+    y <- do.call("t_test", c(DATA, list(...)))
+    y$data.name <- DNAME
+    if(length(y$estimate) == 2L)
+        names(y$estimate) <- paste("mean in group", levels(g))
+    y
+}
+
+
+
+#################################################
+# Changed summary.lm print-out. Replaces "Residual standard error" by "s". Also extra line shift.
+print.summary.lm <- function (x, digits = max(3, getOption("digits") - 3), symbolic.cor = x$symbolic.cor, 
+                              signif.stars = getOption("show.signif.stars"), ...) 
+{
+  cat("\nCall:\n", paste(deparse(x$call), sep = "\n", collapse = "\n"), 
+      "\n\n", sep = "")
+  resid <- x$residuals
+  df <- x$df
+  rdf <- df[2L]
+  cat(if (!is.null(x$w) && diff(range(x$w))) 
+    "Weighted ", "Residuals:\n", sep = "")
+  if (rdf > 5L) {
+    nam <- c("Min", "1Q", "Median", "3Q", "Max")
+    rq <- if (length(dim(resid)) == 2L) 
+      structure(apply(t(resid), 1L, quantile), dimnames = list(nam, 
+                                                               dimnames(resid)[[2L]]))
+    else {
+      zz <- zapsmall(quantile(resid), digits + 1)
+      structure(zz, names = nam)
+    }
+    print(rq, digits = digits, ...)
+  }
+  else if (rdf > 0L) {
+    print(resid, digits = digits, ...)
+  }
+  else {
+    cat("ALL", df[1L], "residuals are 0: no residual degrees of freedom!\n")
+  }
+  if (length(x$aliased) == 0L) {
+    cat("\nNo Coefficients\n")
+  }
+  else {
+    if (nsingular <- df[3L] - df[1L]) 
+      cat("\nCoefficients: (", nsingular, " not defined because of singularities)\n", 
+          sep = "")
+    else cat("\nCoefficients:\n")
+    coefs <- x$coefficients
+    if (!is.null(aliased <- x$aliased) && any(aliased)) {
+      cn <- names(aliased)
+      coefs <- matrix(NA, length(aliased), 4, dimnames = list(cn, 
+                                                              colnames(coefs)))
+      coefs[!aliased, ] <- x$coefficients
+    }
+    printCoefmat(coefs, digits = digits, signif.stars = signif.stars, 
+                 na.print = "NA", ...)
+  }
+  cat("\ns:", format(signif(x$sigma, 
+                            digits)), "on", rdf, "degrees of freedom\n")
+  if (nzchar(mess <- naprint(x$na.action))) 
+    cat("  (", mess, ")\n", sep = "")
+  if (!is.null(x$fstatistic)) {
+    cat("Multiple R-squared:", formatC(x$r.squared, digits = digits))
+    cat(",\nAdjusted R-squared:", formatC(x$adj.r.squared, 
+                                          digits = digits), "\nF-statistic:", formatC(x$fstatistic[1L], 
+                                                                                      digits = digits), "on", x$fstatistic[2L], "and", 
+        x$fstatistic[3L], "DF,  p-value:", format.pval(pf(x$fstatistic[1L], 
+                                                          x$fstatistic[2L], x$fstatistic[3L], lower.tail = FALSE), 
+                                                       digits = digits), "\n")
+  }
+  correl <- x$correlation
+  if (!is.null(correl)) {
+    p <- NCOL(correl)
+    if (p > 1L) {
+      cat("\nCorrelation of Coefficients:\n")
+      if (is.logical(symbolic.cor) && symbolic.cor) {
+        print(symnum(correl, abbr.colnames = NULL))
+      }
+      else {
+        correl <- format(round(correl, 2), nsmall = 2, 
+                         digits = digits)
+        correl[!lower.tri(correl)] <- ""
+        print(correl[-1, -p, drop = FALSE], quote = FALSE)
+      }
+    }
+  }
+  cat("\n")
+  invisible(x)
+}
+
+
+#################################################
+## Property plots for relevant component analysis
+plotprops <- function(Y,X, doscaleX=FALSE, docenterX=TRUE, ncomp, subset){
+  n <- dim(X)[1]
+  p <- dim(X)[2]
+  ncomp <- min(ncomp,min(n,p))
+  if(docenterX) ncomp <- ncomp-1
+  if(ncomp<1)stop("Centering requires at least 2 components")
+  if(missing(subset)) subset <- 1:n
+  X <- scale(X[subset,], center=docenterX, scale=doscaleX)
+  Y <- matrix(Y, ncol=1)[subset,,drop=F]
+  svdres <- svd(X)
+  eigval <- (svdres$d^2)/(svdres$d^2)[1]
+  Z <- X%*%svdres$v
+  covs <- cov(Y, Z)
+  covs <- abs(covs)/max(abs(covs))
+  par(mar=c(5.1, 4.1, 4.1, 4.1))
+  plot(1:ncomp, eigval[1:ncomp], type="h", lwd=2, xlab="Component", ylab="Scaled eigenvalue", axes=FALSE, main="Property plot")
+  points(1:ncomp, covs[1:ncomp], type="p", pch=20, cex=2, col=2)
+  axis(1)
+  axis(2,at=seq(0,1,0.1), labels=as.character(seq(0,1,0.1)))
+  axis(4,at=seq(0,1,0.1), labels=as.character(seq(0,1,0.1)))
+  mtext("Scaled covariance",side=4, line=3)
+  box()
+}
+
+
+#################################################
+## Tally of discrete variable
+tally <- function(x){
+	out  <- table(factor(x))
+	perc <- 100*out/sum(out)
+	cbind(Count=out,CumCount=cumsum(out),Percent=round(perc,2),CumPercent=round(cumsum(perc),2))
+}
+
+
+# #################################################
+# ## Bonferroni
+# Bonferroni <-
+    # function(x, which, ordered = TRUE, conf.level = 0.95, ...)
+    # UseMethod("Bonferroni")
+
+# #################################################
+# ## Bonferroni
+# Bonferroni.lm <-
+    # function(x, which = seq_along(tabs), ordered = TRUE,
+             # conf.level = 0.95, ...)
+# {
+	# xc <- x$call
+	# x <- aov(x)
+	# x$call <- xc
+    # mm <- model.tables(x, "means")
+    # if(is.null(mm$n))
+        # stop("no factors in the fitted model")
+    # tabs <- mm$tables[-1L]
+    # tabs <- tabs[which]
+    # ## mm$n need not be complete -- factors only -- so index by names
+    # nn <- mm$n[names(tabs)]
+    # nn_na <- is.na(nn)
+    # if(all(nn_na))
+        # stop("'which' specified no factors")
+    # if(any(nn_na)) {
+        # warning("'which' specified some non-factors which will be dropped")
+        # tabs <- tabs[!nn_na]
+        # nn <- nn[!nn_na]
+    # }
+    # out <- vector("list", length(tabs))
+    # names(out) <- names(tabs)
+    # MSE <- sum(resid(x)^2, na.rm=TRUE)/x$df.residual
+    # for (nm in names(tabs)) {
+        # tab <- tabs[[nm]]
+        # means <- as.vector(tab)
+        # nms <- if(length(d <- dim(tab)) > 1L) {
+            # dn <- dimnames(tab)
+            # apply(do.call("expand.grid", dn), 1L, paste, collapse=":")
+        # } else names(tab)
+        # n <- nn[[nm]]
+        # ## expand n to the correct length if necessary
+        # if (length(n) < length(means)) n <- rep.int(n, length(means))
+        # if (as.logical(ordered)) {
+            # ord <- order(means)
+            # means <- means[ord]
+            # n <- n[ord]
+            # if (!is.null(nms)) nms <- nms[ord]
+        # }
+        # center <- outer(means, means, "-")
+        # keep <- lower.tri(center)
+        # center <- center[keep]
+        # width <- qt(1-(1-conf.level)/(2*sum(keep)), x$df.residual) *
+            # sqrt((MSE) * outer(1/n, 1/n, "+"))[keep]
+        # est <- center/(sqrt((MSE) * outer(1/n, 1/n, "+"))[keep])
+        # pvals <- p.adjust(pt(abs(est),x$df.residual,lower.tail=FALSE)*2,"bonferroni")
+        # dnames <- list(NULL, c("diff", "lwr", "upr","p adj"))
+        # if (!is.null(nms)) dnames[[1L]] <- outer(nms, nms, paste, sep = "-")[keep]
+        # out[[nm]] <- array(c(center, center - width, center + width,pvals),
+                           # c(length(width), 4), dnames)
+    # }
+    # class(out) <- c("multicomp", "Bonferroni")
+    # attr(out, "orig.call") <- x$call
+    # attr(out, "conf.level") <- conf.level
+    # attr(out, "ordered") <- ordered
+	# attr(out, "data") <- x$model
+	# if(!is.balanced()){
+		# cat("\nWARNING: Unbalanced data may lead to poor estimates\n")
+	# }
+    # out
+# }
+
+# #################################################
+# #### Bonferroni
+# print.Bonferroni <- function(x, digits=getOption("digits"), ...)
+# {
+    # cat("  Bonferroni multiple comparisons of means\n")
+    # cat("    ", format(100*attr(x, "conf.level"), 2),
+        # "% family-wise confidence level\n", sep="")
+    # if (attr(x, "ordered"))
+        # cat("    factor levels have been ordered\n")
+    # cat("\nFit: ", deparse(attr(x, "orig.call"), 500), "\n\n", sep="")
+    # xx <- unclass(x)
+    # attr(xx, "data") <- attr(xx, "orig.call") <- attr(xx, "conf.level") <- attr(xx, "ordered") <- NULL
+    # xx[] <- lapply(xx, function(z, digits)
+               # {z[, "p adj"] <- round(z[, "p adj"], digits); z},
+                   # digits=digits)
+    # print.default(xx, digits, ...)
+    # invisible(x)
+# }
+
+# #################################################
+# #### Bonferroni
+# plot.Bonferroni <- function (x, ...)
+# {
+    # for (i in seq_along(x)) {
+        # xi <- x[[i]][, -4, drop=FALSE] # drop p-values
+        # yvals <- nrow(xi):1
+        # plot(c(xi[, "lwr"], xi[, "upr"]), rep.int(yvals, 2), type = "n",
+             # axes = FALSE, xlab = "", ylab = "", ...)
+        # axis(1, ...)
+        # axis(2, at = nrow(xi):1, labels = dimnames(xi)[[1L]],
+             # srt = 0, ...)
+        # abline(h = yvals, lty = 1, lwd = 0.5, col = "lightgray")
+        # abline(v = 0, lty = 2, lwd = 0.5, ...)
+        # segments(xi[, "lwr"], yvals, xi[, "upr"], yvals, ...)
+        # segments(as.vector(xi), rep.int(yvals - 0.1, 3), as.vector(xi),
+                 # rep.int(yvals + 0.1, 3), ...)
+        # title(main = paste(format(100 * attr(x, "conf.level"),
+              # 2), "% family-wise confidence level\n", sep = ""),
+              # xlab = paste("Differences in mean levels of", names(x)[i]))
+        # box()
+    # }
+# }
+
+# #################################################
+# #### Fisher
+# Fisher <-
+    # function(x, which, ordered = TRUE, conf.level = 0.95, ...)
+    # UseMethod("Fisher")
+
+# #################################################
+# #### Fisher
+# Fisher.lm <-
+    # function(x, which = seq_along(tabs), ordered = TRUE,
+             # conf.level = 0.95, ...)
+# {
+	# xc <- x$call
+	# x <- aov(x)
+	# x$call <- xc
+    # mm <- model.tables(x, "means")
+    # if(is.null(mm$n))
+        # stop("no factors in the fitted model")
+    # tabs <- mm$tables[-1L]
+    # tabs <- tabs[which]
+    # ## mm$n need not be complete -- factors only -- so index by names
+    # nn <- mm$n[names(tabs)]
+    # nn_na <- is.na(nn)
+    # if(all(nn_na))
+        # stop("'which' specified no factors")
+    # if(any(nn_na)) {
+        # warning("'which' specified some non-factors which will be dropped")
+        # tabs <- tabs[!nn_na]
+        # nn <- nn[!nn_na]
+    # }
+    # out <- vector("list", length(tabs))
+    # names(out) <- names(tabs)
+    # MSE <- sum(resid(x)^2, na.rm=TRUE)/x$df.residual
+	# n.means <- 0
+    # for (nm in names(tabs)) {
+        # tab <- tabs[[nm]]
+        # means <- as.vector(tab)
+        # nms <- if(length(d <- dim(tab)) > 1L) {
+            # dn <- dimnames(tab)
+            # apply(do.call("expand.grid", dn), 1L, paste, collapse=":")
+        # } else names(tab)
+        # n <- nn[[nm]]
+        # ## expand n to the correct length if necessary
+        # if (length(n) < length(means)) n <- rep.int(n, length(means))
+        # if (as.logical(ordered)) {
+            # ord <- order(means)
+            # means <- means[ord]
+            # n <- n[ord]
+            # if (!is.null(nms)) nms <- nms[ord]
+        # }
+		# n.means <- n.means+length(means)
+        # center <- outer(means, means, "-")
+        # keep <- lower.tri(center)
+        # center <- center[keep]
+        # width <- qt(1-(1-conf.level)/2, x$df.residual) *
+            # sqrt((MSE) * outer(1/n, 1/n, "+"))[keep]
+        # est <- center/(sqrt((MSE) * outer(1/n, 1/n, "+"))[keep])
+        # pvals <- pt(abs(est),x$df.residual,lower.tail=FALSE)*2
+        # dnames <- list(NULL, c("diff", "lwr", "upr","p adj"))
+        # if (!is.null(nms)) dnames[[1L]] <- outer(nms, nms, paste, sep = "-")[keep]
+        # out[[nm]] <- array(c(center, center - width, center + width,pvals),
+                           # c(length(width), 4), dnames)
+    # }
+    # class(out) <- c("multicomp", "Fisher")
+    # attr(out, "orig.call") <- x$call
+    # attr(out, "conf.level") <- conf.level
+    # attr(out, "fam.level") <- ptukey(sqrt(2)*qt(1-(1-conf.level)/2,x$df.residual),n.means,x$df.residual)
+    # attr(out, "ordered") <- ordered
+	# attr(out, "data") <- x$model
+	# if(!is.balanced()){
+		# cat("\nWARNING: Unbalanced data may lead to poor estimates\n")
+	# }
+    # out
+# }
+
+# #################################################
+# #### Fisher
+# print.Fisher <- function(x, digits=getOption("digits"), ...)
+# {
+    # cat("  Fisher multiple comparisons of means\n")
+    # cat("    ", format(100*attr(x, "conf.level"), digits=4),
+        # "% individual confidence level\n", sep="")
+    # cat("    ", format(100*attr(x, "fam.level"), digits=4),
+        # "% family-wise confidence level\n", sep="")
+    # if (attr(x, "ordered"))
+        # cat("    factor levels have been ordered\n")
+		
+    # cat("\nFit: ", deparse(attr(x, "orig.call"), 500), "\n\n", sep="")
+    # xx <- unclass(x)
+    # attr(xx, "data") <- attr(xx, "orig.call") <- attr(xx, "fam.level") <- attr(xx, "conf.level") <- attr(xx, "ordered") <- NULL
+    # xx[] <- lapply(xx, function(z, digits)
+               # {z[, "p adj"] <- round(z[, "p adj"], digits); z},
+                   # digits=digits)
+    # print.default(xx, digits, ...)
+    # invisible(x)
+# }
+
+# #################################################
+# #### Fisher
+# plot.Fisher <- function (x, ...)
+# {
+    # for (i in seq_along(x)) {
+        # xi <- x[[i]][, -4, drop=FALSE] # drop p-values
+        # yvals <- nrow(xi):1
+        # plot(c(xi[, "lwr"], xi[, "upr"]), rep.int(yvals, 2), type = "n",
+             # axes = FALSE, xlab = "", ylab = "", ...)
+        # axis(1, ...)
+        # axis(2, at = nrow(xi):1, labels = dimnames(xi)[[1L]],
+             # srt = 0, ...)
+        # abline(h = yvals, lty = 1, lwd = 0.5, col = "lightgray")
+        # abline(v = 0, lty = 2, lwd = 0.5, ...)
+        # segments(xi[, "lwr"], yvals, xi[, "upr"], yvals, ...)
+        # segments(as.vector(xi), rep.int(yvals - 0.1, 3), as.vector(xi),
+                 # rep.int(yvals + 0.1, 3), ...)
+        # title(main = paste(format(100 * attr(x, "fam.level"),
+              # 2), "% family-wise confidence level\n", sep = ""),
+              # xlab = paste("Differences in mean levels of", names(x)[i]))
+        # box()
+    # }
+# }
+
+# #################################################
+# #### TukeyHSD
+# TukeyHSD <-
+    # function(x, which, ordered = TRUE, conf.level = 0.95, ...)
+    # UseMethod("TukeyHSD")
+
+# #################################################
+# #### TukeyHSD
+# TukeyHSD.lm <-
+    # function(x, which = seq_along(tabs), ordered = TRUE,
+             # conf.level = 0.95, ...)
+# {
+	# xc <- x$call
+	# x <- aov(x)
+	# x$call <- xc
+    # mm <- model.tables(x, "means")
+    # if(is.null(mm$n))
+        # stop("no factors in the fitted model")
+    # tabs <- mm$tables[-1L]
+    # tabs <- tabs[which]
+    # ## mm$n need not be complete -- factors only -- so index by names
+    # nn <- mm$n[names(tabs)]
+    # nn_na <- is.na(nn)
+    # if(all(nn_na))
+        # stop("'which' specified no factors")
+    # if(any(nn_na)) {
+        # warning("'which' specified some non-factors which will be dropped")
+        # tabs <- tabs[!nn_na]
+        # nn <- nn[!nn_na]
+    # }
+    # out <- vector("list", length(tabs))
+    # names(out) <- names(tabs)
+    # MSE <- sum(resid(x)^2, na.rm=TRUE)/x$df.residual
+    # for (nm in names(tabs)) {
+        # tab <- tabs[[nm]]
+        # means <- as.vector(tab)
+        # nms <- if(length(d <- dim(tab)) > 1L) {
+            # dn <- dimnames(tab)
+            # apply(do.call("expand.grid", dn), 1L, paste, collapse=":")
+        # } else names(tab)
+        # n <- nn[[nm]]
+        # ## expand n to the correct length if necessary
+        # if (length(n) < length(means)) n <- rep.int(n, length(means))
+        # if (as.logical(ordered)) {
+            # ord <- order(means)
+            # means <- means[ord]
+            # n <- n[ord]
+            # if (!is.null(nms)) nms <- nms[ord]
+        # }
+        # center <- outer(means, means, "-")
+        # keep <- lower.tri(center)
+        # center <- center[keep]
+        # width <- qtukey(conf.level, length(means), x$df.residual) *
+            # sqrt((MSE/2) * outer(1/n, 1/n, "+"))[keep]
+        # est <- center/(sqrt((MSE/2) * outer(1/n, 1/n, "+"))[keep])
+        # pvals <- ptukey(abs(est),length(means),x$df.residual,lower.tail=FALSE)
+        # dnames <- list(NULL, c("diff", "lwr", "upr","p adj"))
+        # if (!is.null(nms)) dnames[[1L]] <- outer(nms, nms, paste, sep = "-")[keep]
+        # out[[nm]] <- array(c(center, center - width, center + width,pvals),
+                           # c(length(width), 4), dnames)
+    # }
+    # class(out) <- c("multicomp", "TukeyHSD")
+    # attr(out, "orig.call") <- x$call
+    # attr(out, "conf.level") <- conf.level
+    # attr(out, "ordered") <- ordered
+	# attr(out, "data") <- x$model
+    # out
+# }
+
+# #################################################
+# #### TukeyHSD
+# print.TukeyHSD <- function(x, digits=getOption("digits"), ...)
+# {
+    # cat("  Tukey multiple comparisons of means\n")
+    # cat("    ", format(100*attr(x, "conf.level"), 2),
+        # "% family-wise confidence level\n", sep="")
+    # if (attr(x, "ordered"))
+        # cat("    factor levels have been ordered\n")
+    # cat("\nFit: ", deparse(attr(x, "orig.call"), 500), "\n\n", sep="")
+    # xx <- unclass(x)
+    # attr(xx, "data") <- attr(xx, "orig.call") <- attr(xx, "conf.level") <- attr(xx, "ordered") <- NULL
+    # xx[] <- lapply(xx, function(z, digits)
+               # {z[, "p adj"] <- round(z[, "p adj"], digits); z},
+                   # digits=digits)
+    # print.default(xx, digits, ...)
+    # invisible(x)
+# }
+
+# #################################################
+# #### TukeyHSD
+# plot.TukeyHSD <- function (x, ...)
+# {
+    # for (i in seq_along(x)) {
+        # xi <- x[[i]][, -4, drop=FALSE] # drop p-values
+        # yvals <- nrow(xi):1
+        # dev.hold(); on.exit(dev.flush())
+        # plot(c(xi[, "lwr"], xi[, "upr"]), rep.int(yvals, 2), type = "n",
+             # axes = FALSE, xlab = "", ylab = "", ...)
+        # axis(1, ...)
+        # axis(2, at = nrow(xi):1, labels = dimnames(xi)[[1L]],
+             # srt = 0, ...)
+        # abline(h = yvals, lty = 1, lwd = 0.5, col = "lightgray")
+        # abline(v = 0, lty = 2, lwd = 0.5, ...)
+        # segments(xi[, "lwr"], yvals, xi[, "upr"], yvals, ...)
+        # segments(as.vector(xi), rep.int(yvals - 0.1, 3), as.vector(xi),
+                 # rep.int(yvals + 0.1, 3), ...)
+        # title(main = paste(format(100 * attr(x, "conf.level"),
+              # 2), "% family-wise confidence level\n", sep = ""),
+              # xlab = paste("Differences in mean levels of", names(x)[i]))
+        # box()
+    # }
+# }
+
+
+# #################################################
+# #### Compact letter display
+# cld <- function(object, level = 1-attr(object, "conf.level")){
+  # N.eff <- length(object)
+  # ret   <- list()
+  # for(e in 1:N.eff){
+	# effect <- names(object[e])
+	  # cont  <- rownames(object[[e]])
+	  # cont.split <- strsplit(cont,"-", fixed=TRUE)
+	  # levs  <- unique(unlist(cont.split))
+	  # pvals <- object[[e]][,4]
+	  # data  <- attr(object, "data")
+	  # means <- sort(tapply(data[[1]],data[,effect],mean))
+	  # N <- length(means)
+	  # M <- matrix(0,ncol=N,nrow=N)
+	  # dimnames(M) <- list(names(means),names(means))
+	  # for(i in 1:length(cont.split)){
+		# M[cont.split[[i]][1],cont.split[[i]][2]] <- pvals[i]
+	  # }
+	  # M <- M+t(M)
+	  # comp <- matrix(FALSE,N,N); diag(comp) <- TRUE
+	  # for(i in 1:(N-1)){
+		# j <- i+1
+		# while(j<=N && M[i,j]>level){
+		  # comp[j,i] <- TRUE
+		  # j <- j+1
+		# }
+	  # }
+	  # for(i in 2:N){
+		# k <- max(which(comp[,i]))
+		# j <- i-1
+		# while(j>=1 && M[k,j]>level){
+		  # comp[j,i] <- TRUE
+		  # j <- j-1
+		# }
+	  # }
+	  # comp <- t(unique(t(comp)))
+	  # dimnames(comp) <- list(names(means),LETTERS[1:dim(comp)[2]])
+	  # cld <- matrix("",nrow=N,ncol=dim(comp)[2])
+	  
+	  # for(i in 1:dim(comp)[2]){
+		# cld[comp[,i],i] <- LETTERS[i]
+	  # }
+	  # rownames(cld) <- rownames(comp)
+	  # cld <- data.frame(gr=I(cld),means=means)
+	  # ret[[effect]] <- list(comp=comp,cld=cld)
+  # }
+  # class(ret) <- "cld"
+  # ret
+# }
+
+# print.cld <- function(x, ...){
+	# for(i in 1:length(x))
+		# print(x[[i]]$cld)
+# }
+
+
+# Kommenter, flette inn generalTukey med effect
+simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), level = 0.95, ...) {
+	if(missing(corr)){
+		corr <- "Tukey"
+	}
+	chkdots <- function(...) {
+
+		lst <- list(...)
+		if (length(lst) > 0) {
+			warning("Argument(s) ", sQuote(names(lst)), " passed to ", sQuote("..."), 
+					" are ignored", call. = TRUE)
+		}
+	}
+	generalTukey <- function(mod,effect, ...){
+	  if(grepl(":", effect)){
+		pro  <- sub(":", "*", effect)
+		prox <- sub(":", "_", effect)
+		cola <- sub(":", "",  effect)
+		spli <- unlist(strsplit(effect,":"))
+		data <- model.frame(mod)
+		eval(parse(text=paste("data$",prox," <- with(data, interaction(", paste(spli,collapse=",",sep=""),", sep=':'))")))
+		mod <- update(mod, formula(paste(".~-", pro, "+",prox)), data=data)
+		ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",prox,"='Tukey'))")))
+	  } else {
+		ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
+	  }
+	  ret
+	}
+	object <- generalTukey(mod,effect,...)
+
+    chkdots(...)
+	
+	test <- switch(corr,
+         Tukey      = adjusted(),
+         Bonferroni = adjusted("bonferroni"),
+         Fisher     = univariate())
+	calpha <- switch(corr,
+         Tukey      = adjusted_calpha(),
+         Bonferroni = adjusted_calpha("bonferroni"),
+         Fisher     = univariate_calpha())
+
+	ts <- test(object)
+    object$test <- ts
+
+    type <- attr(calpha, "type")
+    if (is.function(calpha))
+        calpha <- calpha(object, level)
+    if (!is.numeric(calpha) || length(calpha) != 1)
+        stop(sQuote("calpha"), " is not a scalar")
+    error <- attr(calpha, "error")
+    attributes(calpha) <- NULL
+
+    betahat <- coef(object)
+    ses <- sqrt(diag(vcov(object)))
+    switch(object$alternative, "two.sided" = {
+            LowerCL <- betahat - calpha * ses
+            UpperCL <- betahat + calpha * ses
+        }, "less" = {
+            LowerCL <- rep(-Inf, length(ses))
+            UpperCL <- betahat + calpha * ses
+        }, "greater" = {
+            LowerCL <- betahat + calpha * ses
+            UpperCL <- rep( Inf, length(ses))
+    })
+
+    ci <- cbind(LowerCL, UpperCL)
+    colnames(ci) <- c("lower", "upper")
+    object$confint <- cbind(betahat, ci)
+    colnames(object$confint) <- c("Estimate", "lwr", "upr")
+    attr(object$confint, "conf.level") <- level
+    attr(object$confint, "calpha") <- calpha
+    attr(object$confint, "error") <- error
+    if (is.null(type)) type <- "univariate"
+    attr(object, "type") <- type
+	attr(object, "corr") <- corr
+    class(object) <- switch(class(ts), "mtest" = "summary.glht",
+                                       "gtest" = "summary.gtest")
+    class(object) <- c("simple.glht", class(object), "glht")
+    return(object)
+}
+
+
+print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), 
+                              ...) 
+{
+    cat("\n\t", "Simultaneous Confidence Intervals and Tests for General Linear Hypotheses\n\n")
+    if (!is.null(x$type))
+        cat("Multiple Comparisons of Means:", attr(x, "corr"), "Contrasts\n\n\n")
+    if (!is.null(x$type))
+    level <- attr(x$confint, "conf.level")
+    attr(x$confint, "conf.level") <- NULL
+    cat("Fit: ")
+    if (isS4(x$model)) {
+        print(x$model@call)
+    } else {
+        print(x$model$call)
+    }
+    cat("\n")
+    error <- attr(x$confint, "error")
+    if (!is.null(error) && error > .Machine$double.eps)
+        digits <- min(digits, which.min(abs(1 / error - (10^(1:10)))))
+    cat("Quantile =", round(attr(x$confint, "calpha"), digits))
+    cat("\n")
+    if (attr(x, "type") == "adjusted") {
+        cat(paste(level * 100, 
+                  "% family-wise confidence level\n", sep = ""), "\n\n")
+    } else {
+        cat(paste(level * 100, 
+                  "% confidence level\n", sep = ""), "\n\n")
+    }
+    
+    ### <FIXME>: compute coefmat in summary.glht for easier access???
+    pq <- x$test
+    mtests <- cbind(pq$coefficients, pq$sigma, pq$tstat, pq$pvalues)
+    error <- attr(pq$pvalues, "error")
+    pname <- switch(x$alternativ,
+        "less" = paste("Pr(<", ifelse(x$df == 0, "z", "t"), ")", sep = ""),
+        "greater" = paste("Pr(>", ifelse(x$df == 0, "z", "t"), ")", sep = ""),
+        "two.sided" = paste("Pr(>|", ifelse(x$df == 0, "z", "t"), "|)", sep = ""))
+    colnames(mtests) <- c("Estimate", "Std. Error",
+        ifelse(x$df == 0, "z value", "t value"), pname)
+    type <- pq$type
+
+    ### print p values according to simulation precision
+    if (!is.null(error) && error > .Machine$double.eps) {
+        sig <- which.min(abs(1 / error - (10^(1:10))))
+        sig <- 1 / (10^sig)
+    } else {
+        sig <- .Machine$double.eps
+    }
+    cat("Linear Hypotheses:\n")
+    alt <- switch(x$alternative,
+                  "two.sided" = "==", "less" = ">=", "greater" = "<=")
+    rownames(mtests) <- paste(rownames(mtests), alt, x$rhs)
+    ### </FIXME>
+
+    rownames(x$confint) <- paste(rownames(x$confint), alt, x$rhs)
+	mtests <- cbind(x$confint,mtests[,2:4,drop=FALSE])
+    printCoefmat(mtests, digits = digits, 
+                 has.Pvalue = TRUE, P.values = TRUE, eps.Pvalue = sig)
+
+    switch(type, 
+        "univariate" = cat("(Univariate p values reported)"),
+        "single-step" = cat("(Adjusted p values reported -- single-step method)"),
+        "Shaffer" = cat("(Adjusted p values reported -- Shaffer method)"),
+        "Westfall" = cat("(Adjusted p values reported -- Westfall method)"),
+        cat("(Adjusted p values reported --", type, "method)")
+    )
+    cat("\n\n")
+    invisible(x)                    
+}
+
+#cld.simple.glht <- function(object, decreasing = FALSE, ...) {
+#	multcomp:::cld.summary.glht(object, decreasing = FALSE, ...)
+#}
