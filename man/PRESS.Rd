@@ -14,12 +14,15 @@ Various summaries of predictions and PRESS residuals.
 R2pred(object = NULL)
 RMSEP(object)
 PRESS(object = NULL)
-PRESS.res(object = NULL)
-PRESS.pred(object = NULL)
+PRESS.res(object = NULL, ncomp = NULL)
+PRESS.pred(object = NULL, ncomp = NULL)
 }
 \arguments{
   \item{object}{
 	a fitted model of type \code{lm} or \code{mvr}.
+}
+  \item{ncomp}{
+	number of components to use with \code{mvr} (optional).
 }
 }
 \details{

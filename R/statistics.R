@@ -263,17 +263,55 @@ backward <- function(model, alpha=0.2, full=FALSE, hierarchy=TRUE, force.in=NULL
 
 #######################
 ## PRESS statistics
-PRESS.res <- function(object=NULL) {
+PRESS.res <- function(object=NULL, ncomp=NULL) {
 	if(is.null(object) && "package:Rcmdr"%in%search()){
 		try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
 	}
-	residuals(object)/(1-lm.influence(object)$hat)
+	if(class(object)[1]=="lm" || class(objects)[1]=="glm"){
+		return(residuals(object)/(1-lm.influence(object)$hat))
+	}
+	if(class(object)[1]=="mvr"){
+		if(is.null(object$validation)){
+			if(dim(object$model)[1] < 10){
+				warning("Refitting with leave-one-out cross-validation as no cross-validation was done")
+				object <- update(object,validation="LOO")
+			} else {
+				warning("Refitting with 10-fold cross-validation as no cross-validation was done")
+				object <- update(object,validation="CV")
+			}
+		}
+		if(is.null(ncomp)){
+			ncomp <- object$validation$ncomp
+		} else {
+			ncomp <- min(ncomp, object$validation$ncomp)
+		}
+		return(response(object)-object$validation$pred[,,ncomp])
+	}
 }
-PRESS.pred <- function(object=NULL) {
+PRESS.pred <- function(object=NULL, ncomp=NULL) {
 	if(is.null(object)){
 		try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
 	}
-	model.response(model.frame(object)) - residuals(object)/(1-lm.influence(object)$hat)
+	if(class(object)[1]=="lm" || class(objects)[1]=="glm"){
+		return(model.response(model.frame(object)) - residuals(object)/(1-lm.influence(object)$hat))
+	}
+	if(class(object)[1]=="mvr"){
+		if(is.null(object$validation)){
+			if(dim(object$model)[1] < 10){
+				warning("Refitting with leave-one-out cross-validation as no cross-validation was done")
+				object <- update(object,validation="LOO")
+			} else {
+				warning("Refitting with 10-fold cross-validation as no cross-validation was done")
+				object <- update(object,validation="CV")
+			}
+		}
+		if(is.null(ncomp)){
+			ncomp <- object$validation$ncomp
+		} else {
+			ncomp <- min(ncomp, object$validation$ncomp)
+		}
+		return(object$validation$pred[,,ncomp])
+	}
 }
 PRESS <- function(object=NULL) {
 	if(is.null(object) && "package:Rcmdr"%in%search()){

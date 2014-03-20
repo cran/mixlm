@@ -34,7 +34,11 @@ glm <- function(formula, family = gaussian, data, weights,
 				REML <- TRUE
 				warning("REML must be logical")
 			}
-			object <- lme4::glmer(rw$reml.formula, data, family = family, REML = REML, contrasts = contrasts, na.action = na.action, ...)
+			if(family$family == "gaussian" && family$link =="identity"){
+				object <- lme4::lmer(rw$reml.formula, data, REML = REML, contrasts = contrasts, na.action = na.action, ...)
+			} else {
+				object <- lme4::glmer(rw$reml.formula, data, family = family, contrasts = contrasts, na.action = na.action, ...)
+			}
 			object@call <- call
 			return(object)
 		}
