@@ -84,9 +84,9 @@ relatives <- function(term, names, factors){
 					function(term2) is.relative(term, term2))]
 }
 
-Anova <- function(mod, ...){
-	UseMethod("Anova", mod)
-}
+# Anova <- function(mod, ...){
+# 	UseMethod("Anova", mod)
+# }
 
 Anova.II.lm <- function(mod, error, singular.ok=TRUE, ...){
 	if (!missing(error)){
@@ -230,3 +230,18 @@ response <- function(model, ...) {
 }
 
 response.default <- function (model, ...) model.response(model.frame(model))
+
+coef.multinom <- function(object, ...)
+{
+  r <- length(object$vcoefnames)
+  if(length(object$lev) == 2L) {
+    coef <- object$wts[1L+(1L:r)]
+    names(coef) <- object$vcoefnames
+  } else {
+    coef <- matrix(object$wts, nrow = object$n[3L], byrow=TRUE)[, 1L+(1L:r), drop=FALSE]
+    if(length(object$lev)) dimnames(coef) <- list(object$lev, object$vcoefnames)
+    if(length(object$lab)) dimnames(coef) <- list(object$lab, object$vcoefnames)
+    coef <- coef[-1L, , drop=FALSE]
+  }
+  coef
+}
