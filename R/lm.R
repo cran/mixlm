@@ -131,12 +131,13 @@ AnovaMix <- function(object){
 	n.randoms    <- length(ind.randoms)
 					
 	# Estimate fixed effect Anova
-	noRandom <- object
+	opt <- options("contrasts")
+	options(contrasts=c('contr.sum','contr.poly'))
+	noRandom <- update(object)
 	noRandom$random <- NULL
-	fixed.model <- as.data.frame(Anova.lm(noRandom, type='III'))
-#	fixed.model <- as.data.frame(car:::Anova.lm(object, type='III'))
-	fixed.model <- fixed.model[-1,] # Remove intercept
-#	fixed.model <- cbind(fixed.model[,c(1,2)], "Mean Sq"=fixed.model[,1]/fixed.model[,2], fixed.model[,c(3,4)])
+	fixed.model <- as.data.frame(Anova.lm(noRandom, type='II', singular.ok=TRUE))
+  options(contrasts=opt$contrasts)
+# 	fixed.model <- fixed.model[-1,] # Remove intercept
 	fixed.model <- fixed.model[c(all.effects,"Residuals"),] # Sort according to all.effects
 
 	# Check which effects should use interactions as denominators instead of error
@@ -182,7 +183,7 @@ AnovaMix <- function(object){
 	denom.df <- numeric(n.effects+1)
 	exp.mean.sq <- rep(paste("(",n.effects+1,")", sep=""), n.effects+1)
 	var.comps <- numeric(n.effects+1)*NA
-	var.comps[n.effects+1] <- fixed.model[n.effects+1,3]
+	var.comps[n.effects+1] <- fixed.model[n.effects+1,"Mean Sq"]
 	errors <- numeric(n.effects)
 	for(i in 1:n.effects) {
 		if(!is.logical(approved.interactions[[i]])){
@@ -205,19 +206,19 @@ AnovaMix <- function(object){
 			mix.model.attr[[i]] <- denominator <- denominator[denominator!=0]
 			names(mix.model.attr[[i]]) <- denominator.id
 			if(length(denominator)==1){ # Original df
-				denom.df[i] <- fixed.model[denominator.id,2]}
+				denom.df[i] <- fixed.model[denominator.id,"Df"]}
 			else{ # Satterthwaite's df correction
-				denom.df[i] <- sum(fixed.model[denominator.id,3]*denominator)^2/sum((fixed.model[denominator.id,3]*denominator)^2/fixed.model[denominator.id,2])} 
+				denom.df[i] <- sum(fixed.model[denominator.id,"Mean Sq"]*denominator)^2/sum((fixed.model[denominator.id,"Mean Sq"]*denominator)^2/fixed.model[denominator.id,"Df"])} 
 		} else{
 			denominator.id <- n.effects+1
 			mix.model.attr[[i]] <- 1
 			names(mix.model.attr[[i]]) <- denominator.id
-			denom.df[i] <- fixed.model[denominator.id,2]
+			denom.df[i] <- fixed.model[denominator.id,"Df"]
 			denominator <- 1
 		}
 		if(sum(ind.randoms==i)>0){
 			exp.mean.sq[i] <- paste(exp.mean.sq[i], " + ", N/prod(n.levels[strsplit(all.effects[i],":")[[1]]]), " (",i,")", sep="")
-			var.comps[i] <- (fixed.model[i,3]-fixed.model[denominator.id,3]%*%denominator)/(N/prod(n.levels[strsplit(all.effects[i],":")[[1]]]))}
+			var.comps[i] <- (fixed.model[i,"Mean Sq"]-fixed.model[denominator.id,"Mean Sq"]%*%denominator)/(N/prod(n.levels[strsplit(all.effects[i],":")[[1]]]))}
 		else{
 			if(!is.logical(approved.interactions.fixed[[i]])){
 				ex.ind <- paste(",", paste(approved.interactions.fixed[[i]], sep="", collapse=","),sep="")}
@@ -225,11 +226,12 @@ AnovaMix <- function(object){
 				ex.ind <- ""}
 			exp.mean.sq[i] <- paste(exp.mean.sq[i], " + ", N/prod(n.levels[strsplit(all.effects[i],":")[[1]]]), " Q[",i,ex.ind,"]", sep="")
 		}
-		errors[i] <- fixed.model[denominator.id,3]
-		fixed.model[i,4] <- fixed.model[i,3]/(fixed.model[denominator.id,3]%*%denominator)
-		if(fixed.model[i,4]<0){
-			fixed.model[i,4] <- NA}
-		fixed.model[i,5] <- 1-pf(fixed.model[i,4],fixed.model[i,2],denom.df[i])
+		errors[i] <- fixed.model[denominator.id,"Mean Sq"]%*%denominator
+		fixed.model[i,"F value"] <- fixed.model[i,"Mean Sq"]/(fixed.model[denominator.id,"Mean Sq"]%*%denominator)
+		if(is.na(fixed.model[i,"F value"]) || fixed.model[i,"F value"]<0){
+			fixed.model[i,"F value"] <- NA
+		}
+		fixed.model[i,"Pr(>F)"] <- 1-pf(fixed.model[i,"F value"],fixed.model[i,"Df"],denom.df[i])
 	}
 	names(denom.df) <- rownames(fixed.model)
 	object <- list(lm=object, anova=fixed.model, err.terms=c(mix.model.attr,NA), denom.df=denom.df, restricted=restrictedModel,
@@ -330,26 +332,7 @@ lm <- function (formula, data, subset, weights, na.action,
 			if(is.logical(REML)){ # Perform 
 				cl[[1]] <- as.name("lmer")
 				cl[["formula"]] <- rw$reml.formula
-				#txt <- paste("lme4::lmer(", as.character.formula(rw$reml.formula), sep="")
-				#for( i in 3:length(cl) ){
-				#	if( names(cl)[i] != "" ){
-				#		txt <- paste(txt, ", ", names(cl)[i], "=", cl[[i]], sep="")
-				#	} else {
-				#		txt <- paste(txt, ", ", cl[[i]], sep="")
-				#	}
-				#}
-				#txt <- paste(txt, ")", sep="")
 				object <- eval(cl,parent.frame())
-				#object <- eval(txt)
-				#N <- dim(data)[1]
-				#Lcontrasts <- ifelse(missing(contrasts), NA, contrasts)
-				#Lsubset    <- ifelse(missing(subset), 1:N, subset)
-				#Lweights   <- ifelse(missing(weights), rep(1,N), weights)
-				#if(missing(na.action)){
-			#		object <- lme4::lmer(rw$reml.formula, data, REML = REML, contrasts = Lcontrasts, subset = Lsubset, weights = Lweights, ...)
-				#} else{
-				#	object <- lme4::lmer(rw$reml.formula, data, REML = REML, contrasts = Lcontrasts, subset = Lsubset, weights = Lweights, na.action = Lna.action, ...)
-				#}
 				object@call <- cl
 				return(object)
 			}
@@ -401,6 +384,7 @@ lm <- function (formula, data, subset, weights, na.action,
 		col.names   <- effect.labels(mt,data) # mt er "terms" fra formula, x er model.matrix
 		if(length(col.names)==length(colnames(x))){
 			colnames(x) <- effect.labels(mt,data)
+      effect.sources <- effect.source(mt,data)
 		}
 	}
 	## End edit
@@ -429,6 +413,8 @@ lm <- function (formula, data, subset, weights, na.action,
 			stop("Mixed models containing continuous effects not supported")
 		}
 	}
+  if(exists("effect.sources") && !is.null(effect.sources))
+    z$effect.sources <- effect.sources
 	## End edit
     z
 }
@@ -481,3 +467,168 @@ random.worker <- function(formula, data, REML = NULL){
 		}
 	}
 }
+
+
+###########################################
+# summary.lm from stats, edited to enable limited classical least squares mixed models
+summary.lm <- function (object, correlation = FALSE, symbolic.cor = FALSE, ...) {
+  z <- object
+  p <- z$rank
+  rdf <- z$df.residual
+  if (p == 0) {
+    r <- z$residuals
+    n <- length(r)
+    w <- z$weights
+    if (is.null(w)) {
+      rss <- sum(r^2)
+    }
+    else {
+      rss <- sum(w * r^2)
+      r <- sqrt(w) * r
+    }
+    resvar <- rss/rdf
+    ans <- z[c("call", "terms", if (!is.null(z$weights)) "weights")]
+    class(ans) <- "summary.lm"
+    ans$aliased <- is.na(coef(object))
+    ans$residuals <- r
+    ans$df <- c(0L, n, length(ans$aliased))
+    ans$coefficients <- matrix(NA, 0L, 4L)
+    dimnames(ans$coefficients) <- list(NULL, c("Estimate", 
+                                               "Std. Error", "t value", "Pr(>|t|)"))
+    ans$sigma <- sqrt(resvar)
+    ans$r.squared <- ans$adj.r.squared <- 0
+    return(ans)
+  }
+  if (is.null(z$terms)) 
+    stop("invalid 'lm' object:  no 'terms' component")
+  if (!inherits(object, "lm")) 
+    warning("calling summary.lm(<fake-lm-object>) ...")
+  Qr <- qr.lm(object)
+  n <- NROW(Qr$qr)
+  if (is.na(z$df.residual) || n - p != z$df.residual) 
+    warning("residual degrees of freedom in object suggest this is not an \"lm\" fit")
+  r <- z$residuals
+  f <- z$fitted.values
+  w <- z$weights
+  if (is.null(w)) {
+    mss <- if (attr(z$terms, "intercept")) 
+      sum((f - mean(f))^2)
+    else sum(f^2)
+    rss <- sum(r^2)
+  }
+  else {
+    mss <- if (attr(z$terms, "intercept")) {
+      m <- sum(w * f/sum(w))
+      sum(w * (f - m)^2)
+    }
+    else sum(w * f^2)
+    rss <- sum(w * r^2)
+    r <- sqrt(w) * r
+  }
+  p1 <- 1L:p # Moved up for the sake of "random"
+  if(is.null(object$random)){
+    resvar <- rss/rdf
+  } else {
+    An <- Anova(object,type=3)
+    effect.names <- rownames(An$anova)
+    if(is.null(object$effect.sources))
+      stop("Effect sources not found")
+    errors <- An$errors
+    err.df <- An$denom.df
+    inds <- match(object$effect.sources[-1],effect.names)
+    #  resvar <- c(rss/rdf,errors[inds]/err.df[inds])
+    resvar <- c(rss/rdf,errors[inds])[Qr$pivot[p1]]
+  }
+  if (is.finite(resvar) && resvar < (mean(f)^2 + var(f)) * 
+        1e-30) 
+    warning("essentially perfect fit: summary may be unreliable")
+  R    <- chol2inv(Qr$qr[p1, p1, drop = FALSE])
+  se   <- sqrt(diag(R) * resvar)
+  est  <- z$coefficients[Qr$pivot[p1]]
+  tval <- est/se
+  ans  <- z[c("call", "terms", if (!is.null(z$weights)) "weights")]
+  ans$residuals <- r
+  ans$coefficients <- cbind(est, se, tval, 2 * pt(abs(tval), 
+                                                  rdf, lower.tail = FALSE))
+  dimnames(ans$coefficients) <- list(names(z$coefficients)[Qr$pivot[p1]], 
+                                     c("Estimate", "Std. Error", "t value", "Pr(>|t|)"))
+  ans$aliased <- is.na(coef(object))
+  ans$sigma <- sqrt(resvar[1])
+  ans$df <- c(p, rdf, NCOL(Qr$qr))
+  if (p != attr(z$terms, "intercept")) {
+    df.int <- if (attr(z$terms, "intercept")) 
+      1L
+    else 0L
+    ans$r.squared <- mss/(mss + rss)
+    ans$adj.r.squared <- 1 - (1 - ans$r.squared) * ((n - 
+                                                       df.int)/rdf[1])
+    ans$fstatistic <- c(value = (mss/(p - df.int))/resvar[1], 
+                        numdf = p - df.int, dendf = rdf[1])
+  }
+  else ans$r.squared <- ans$adj.r.squared <- 0
+  ans$cov.unscaled <- R
+  dimnames(ans$cov.unscaled) <- dimnames(ans$coefficients)[c(1, 
+                                                             1)]
+  if (correlation) {
+    ans$correlation <- (R * resvar)/outer(se, se)
+    dimnames(ans$correlation) <- dimnames(ans$cov.unscaled)
+    ans$symbolic.cor <- symbolic.cor
+  }
+  if (!is.null(z$na.action)) 
+    ans$na.action <- z$na.action
+  if(!is.null(object$random) && !is.balanced(object)){
+    cat("\nWARNING: Unbalanced data may lead to poor estimates\n")
+  }
+  class(ans) <- "summary.lm"
+  ans
+}
+
+
+###########################################
+# confint.lm from stats, edited to enable limited classical least squares mixed models
+confint.lm <- function (object, parm, level = 0.95, ...) 
+{
+  cf <- coef(object)
+  pnames <- names(cf)
+  if (missing(parm)) 
+    parm <- pnames
+  else if (is.numeric(parm)) 
+    parm <- pnames[parm]
+  a <- (1 - level)/2
+  a <- c(a, 1 - a)
+  fac <- qt(a, object$df.residual)
+  pct <- format.perc(a, 3)
+  ci <- array(NA, dim = c(length(parm), 2L), dimnames = list(parm, 
+                                                             pct))
+  if(is.null(object$random)){
+    ses <- sqrt(diag(vcov(object)))[parm]
+  } else {
+    p <- object$rank
+    p1 <- 1L:p # Moved up for the sake of "random"
+    Qr <- qr.lm(object)
+    rdf <- object$df.residual
+    r <- object$residuals
+    w <- object$weights
+    if (is.null(w)) {
+      rss <- sum(r^2)
+    } else {
+      rss <- sum(w * r^2)
+    }
+    An <- Anova(object,type=3)
+    effect.names <- rownames(An$anova)
+    if(is.null(object$effect.sources))
+      stop("Effect sources not found")
+    errors <- An$errors
+    err.df <- An$denom.df
+    inds <- match(object$effect.sources[-1],effect.names)
+    resvar <- c(rss/rdf,errors[inds])[Qr$pivot[p1]]
+    R    <- chol2inv(Qr$qr[p1, p1, drop = FALSE])
+    ses   <- sqrt(diag(R) * resvar)[match(parm,colnames(vcov(object)))]
+  }
+
+  ci[] <- cf[parm] + ses %o% fac
+  ci
+}
+format.perc <- function (probs, digits) 
+  paste(format(100 * probs, trim = TRUE, scientific = FALSE, digits = digits), 
+        "%")

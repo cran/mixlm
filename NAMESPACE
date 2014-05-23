@@ -5,6 +5,7 @@ import(lme4)
 import(car)
 importFrom(pls,plsr)
 importFrom(multcomp,glht)
+importFrom(multcomp,cld)
 
 export(
     Anova,
@@ -46,6 +47,7 @@ export(
     stepWiseBack,
     summaryMultinom,
     summaryOrdinal,
+    summary.lm,
     t_test,
     t_test.default,
     t_test.formula,
@@ -60,3 +62,6 @@ export(
 )
 
 S3method(Anova, lm)
+#S3method(summary, lm)
+S3method(cld, simple.glht)
+S3method(print, cldMix)

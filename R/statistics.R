@@ -1538,69 +1538,115 @@ tally <- function(x){
 
 # Kommenter, flette inn generalTukey med effect
 simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), level = 0.95, ...) {
-	if(missing(corr)){
-		corr <- "Tukey"
-	}
-	chkdots <- function(...) {
-
-		lst <- list(...)
-		if (length(lst) > 0) {
-			warning("Argument(s) ", sQuote(names(lst)), " passed to ", sQuote("..."), 
-					" are ignored", call. = TRUE)
-		}
-	}
-	generalTukey <- function(mod,effect, ...){
-	  if(grepl(":", effect)){
-		pro  <- sub(":", "*", effect)
-		prox <- sub(":", "_", effect)
-		cola <- sub(":", "",  effect)
-		spli <- unlist(strsplit(effect,":"))
-		data <- model.frame(mod)
-		eval(parse(text=paste("data$",prox," <- with(data, interaction(", paste(spli,collapse=",",sep=""),", sep=':'))")))
-		mod <- update(mod, formula(paste(".~-", pro, "+",prox)), data=data)
-		ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",prox,"='Tukey'))")))
-	  } else {
-		ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
-	  }
-	  ret
-	}
-	object <- generalTukey(mod,effect,...)
-
-    chkdots(...)
-	
-	test <- switch(corr,
-         Tukey      = adjusted(),
-         Bonferroni = adjusted("bonferroni"),
-         Fisher     = univariate())
-	calpha <- switch(corr,
-         Tukey      = adjusted_calpha(),
-         Bonferroni = adjusted_calpha("bonferroni"),
-         Fisher     = univariate_calpha())
-
-	ts <- test(object)
+  if(missing(corr)){
+    corr <- "Tukey"
+  }
+  random <- ifelse(is.null(mod$random),FALSE,TRUE)
+  if(random){
+    if(corr!="Tukey")
+      stop("Only Tukey correction supported for mixed models.")
+    if(grepl(":", effect))
+      stop("Only main effects supported for mixed models.")
+    if(effect%in%mod$random$random)
+      stop("Only fixed effects supported for mixed models.")
+  }
+  chkdots <- function(...) {
+    
+    lst <- list(...)
+    if (length(lst) > 0) {
+      warning("Argument(s) ", sQuote(names(lst)), " passed to ", sQuote("..."), 
+              " are ignored", call. = TRUE)
+    }
+  }
+  generalTukey <- function(mod,effect,random, ...){
+    if(random){
+      warn <- options("warn")
+      options(warn=-1)
+    }
+    if(grepl(":", effect)){
+      pro  <- sub(":", "*", effect)
+      prox <- sub(":", "_", effect)
+      cola <- sub(":", "",  effect)
+      spli <- unlist(strsplit(effect,":"))
+      data <- model.frame(mod)
+      eval(parse(text=paste("data$",prox," <- with(data, interaction(", paste(spli,collapse=",",sep=""),", sep=':'))")))
+      mod <- update(mod, formula(paste(".~-", pro, "+",prox)), data=data)
+      if(random){
+        ret <- list()
+        ret$res <- TukeyMix(mod,effect,level)
+        ret$model <- mod
+      } else {
+        ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",prox,"='Tukey'))")))
+      }
+    } else {
+      if(random){
+        ret <- list()
+        ret$res <- TukeyMix(mod,effect,level)
+        ret$model <- mod
+      } else {
+        ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
+      }
+    }
+    if(random){
+      options(warn=warn$warn)
+    }
+    ret
+  }
+  object <- generalTukey(mod,effect,random,...)
+  
+  chkdots(...)
+  
+  test <- switch(corr,
+                 Tukey      = adjusted(),
+                 Bonferroni = adjusted("bonferroni"),
+                 Fisher     = univariate())
+  calpha <- switch(corr,
+                   Tukey      = adjusted_calpha(),
+                   Bonferroni = adjusted_calpha("bonferroni"),
+                   Fisher     = univariate_calpha())
+  
+  if(random){
+    object$test <- 0
+  } else {
+    ts <- test(object)
     object$test <- ts
-
+  }
+  
+  if(random){
+    type <- "Tukey"
+    object$type <- type
+  } else {
     type <- attr(calpha, "type")
-    if (is.function(calpha))
-        calpha <- calpha(object, level)
-    if (!is.numeric(calpha) || length(calpha) != 1)
-        stop(sQuote("calpha"), " is not a scalar")
+  }
+  if (is.function(calpha))
+    if(random){
+      calpha <- 0
+    } else {
+      calpha <- calpha(object, level)
+    }
+  if (!is.numeric(calpha) || length(calpha) != 1)
+    stop(sQuote("calpha"), " is not a scalar")
+  if(random){
+    error <- attr(object,"error")
+  } else{
     error <- attr(calpha, "error")
-    attributes(calpha) <- NULL
-
+  }
+  attributes(calpha) <- NULL
+  
+  if(!random){
     betahat <- coef(object)
     ses <- sqrt(diag(vcov(object)))
     switch(object$alternative, "two.sided" = {
-            LowerCL <- betahat - calpha * ses
-            UpperCL <- betahat + calpha * ses
-        }, "less" = {
-            LowerCL <- rep(-Inf, length(ses))
-            UpperCL <- betahat + calpha * ses
-        }, "greater" = {
-            LowerCL <- betahat + calpha * ses
-            UpperCL <- rep( Inf, length(ses))
+      LowerCL <- betahat - calpha * ses
+      UpperCL <- betahat + calpha * ses
+    }, "less" = {
+      LowerCL <- rep(-Inf, length(ses))
+      UpperCL <- betahat + calpha * ses
+    }, "greater" = {
+      LowerCL <- betahat + calpha * ses
+      UpperCL <- rep( Inf, length(ses))
     })
-
+    
     ci <- cbind(LowerCL, UpperCL)
     colnames(ci) <- c("lower", "upper")
     object$confint <- cbind(betahat, ci)
@@ -1608,86 +1654,226 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     attr(object$confint, "conf.level") <- level
     attr(object$confint, "calpha") <- calpha
     attr(object$confint, "error") <- error
-    if (is.null(type)) type <- "univariate"
-    attr(object, "type") <- type
-	attr(object, "corr") <- corr
+  } else {
+    object$confint <- 0
+    attr(object$confint, "conf.level") <- level
+  }
+  
+  if (is.null(type)) type <- "univariate"
+  attr(object, "type") <- type
+  attr(object, "corr") <- corr
+  if(random){
+    attr(object, "random") <- TRUE
+  }
+  if(random){
+    class(object) <- "summary.glht"
+  } else {
     class(object) <- switch(class(ts), "mtest" = "summary.glht",
-                                       "gtest" = "summary.gtest")
-    class(object) <- c("simple.glht", class(object), "glht")
-    return(object)
+                            "gtest" = "summary.gtest")
+  }
+  class(object) <- c("simple.glht", class(object), "glht")
+  return(object)
 }
 
-
-print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), 
-                              ...) 
-{
-    cat("\n\t", "Simultaneous Confidence Intervals and Tests for General Linear Hypotheses\n\n")
-    if (!is.null(x$type))
-        cat("Multiple Comparisons of Means:", attr(x, "corr"), "Contrasts\n\n\n")
-    if (!is.null(x$type))
+# Print method
+print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), ...) {
+  cat("\n\t", "Simultaneous Confidence Intervals and Tests for General Linear Hypotheses\n\n")
+  if (!is.null(x$type)){
+    cat("Multiple Comparisons of Means:", attr(x, "corr"), "Contrasts\n\n\n")
     level <- attr(x$confint, "conf.level")
-    attr(x$confint, "conf.level") <- NULL
-    cat("Fit: ")
-    if (isS4(x$model)) {
-        print(x$model@call)
-    } else {
-        print(x$model$call)
-    }
-    cat("\n")
-    error <- attr(x$confint, "error")
-    if (!is.null(error) && error > .Machine$double.eps)
-        digits <- min(digits, which.min(abs(1 / error - (10^(1:10)))))
-    cat("Quantile =", round(attr(x$confint, "calpha"), digits))
-    cat("\n")
-    if (attr(x, "type") == "adjusted") {
-        cat(paste(level * 100, 
-                  "% family-wise confidence level\n", sep = ""), "\n\n")
-    } else {
-        cat(paste(level * 100, 
-                  "% confidence level\n", sep = ""), "\n\n")
-    }
-    
-    ### <FIXME>: compute coefmat in summary.glht for easier access???
+  }
+  attr(x$confint, "conf.level") <- NULL
+  cat("Fit: ")
+  if (isS4(x$model)) {
+    print(x$model@call)
+  } else {
+    print(x$model$call)
+  }
+  cat("\n")
+  error <- attr(x$confint, "error")
+  if (!is.null(error) && error > .Machine$double.eps)
+    digits <- min(digits, which.min(abs(1 / error - (10^(1:10)))))
+  if(is.null(attr(x,"random"))){
+    cat("Quantile =", round(attr(x$confint, "calpha"), digits))    
+  } else {
+    cat("Quantile =", round(attr(x$res, "quant"), digits), "\n")
+    cat("Minimum significant difference =", round(attr(x$res,"minSignDiff"),digits))
+  }
+  cat("\n")
+  if (attr(x, "type") == "adjusted") {
+    cat(paste(level * 100, 
+              "% family-wise confidence level\n", sep = ""), "\n")
+  } else {
+    cat(paste(level * 100, 
+              "% confidence level\n", sep = ""), "\n")
+  }
+  
+  ### <FIXME>: compute coefmat in summary.glht for easier access???
+  if(is.null(attr(x,"random"))){
     pq <- x$test
     mtests <- cbind(pq$coefficients, pq$sigma, pq$tstat, pq$pvalues)
     error <- attr(pq$pvalues, "error")
     pname <- switch(x$alternativ,
-        "less" = paste("Pr(<", ifelse(x$df == 0, "z", "t"), ")", sep = ""),
-        "greater" = paste("Pr(>", ifelse(x$df == 0, "z", "t"), ")", sep = ""),
-        "two.sided" = paste("Pr(>|", ifelse(x$df == 0, "z", "t"), "|)", sep = ""))
+                    "less" = paste("Pr(<", ifelse(x$df == 0, "z", "t"), ")", sep = ""),
+                    "greater" = paste("Pr(>", ifelse(x$df == 0, "z", "t"), ")", sep = ""),
+                    "two.sided" = paste("Pr(>|", ifelse(x$df == 0, "z", "t"), "|)", sep = ""))
     colnames(mtests) <- c("Estimate", "Std. Error",
-        ifelse(x$df == 0, "z value", "t value"), pname)
+                          ifelse(x$df == 0, "z value", "t value"), pname)
     type <- pq$type
-
-    ### print p values according to simulation precision
-    if (!is.null(error) && error > .Machine$double.eps) {
-        sig <- which.min(abs(1 / error - (10^(1:10))))
-        sig <- 1 / (10^sig)
-    } else {
-        sig <- .Machine$double.eps
-    }
-    cat("Linear Hypotheses:\n")
     alt <- switch(x$alternative,
                   "two.sided" = "==", "less" = ">=", "greater" = "<=")
+  } else {
+    mtests <- x$res
+    error <- 0
+    alt <- "=="
+    x$rhs <- 0
+    type <- "single-step"
+  }
+  ### print p values according to simulation precision
+  if (!is.null(error) && error > .Machine$double.eps) {
+    sig <- which.min(abs(1 / error - (10^(1:10))))
+    sig <- 1 / (10^sig)
+  } else {
+    sig <- .Machine$double.eps
+  }
+  cat("Linear Hypotheses:\n")
+  #   alt <- switch(x$alternative,
+  #                 "two.sided" = "==", "less" = ">=", "greater" = "<=")
+  ### </FIXME>
+  
+  if(is.null(attr(x,"random"))){
     rownames(mtests) <- paste(rownames(mtests), alt, x$rhs)
-    ### </FIXME>
-
     rownames(x$confint) <- paste(rownames(x$confint), alt, x$rhs)
-	mtests <- cbind(x$confint,mtests[,2:4,drop=FALSE])
-    printCoefmat(mtests, digits = digits, 
-                 has.Pvalue = TRUE, P.values = TRUE, eps.Pvalue = sig)
-
-    switch(type, 
-        "univariate" = cat("(Univariate p values reported)"),
-        "single-step" = cat("(Adjusted p values reported -- single-step method)"),
-        "Shaffer" = cat("(Adjusted p values reported -- Shaffer method)"),
-        "Westfall" = cat("(Adjusted p values reported -- Westfall method)"),
-        cat("(Adjusted p values reported --", type, "method)")
-    )
-    cat("\n\n")
-    invisible(x)                    
+    mtests <- cbind(x$confint,mtests[,2:4,drop=FALSE])
+  }
+  printCoefmat(mtests, digits = digits, 
+               has.Pvalue = TRUE, P.values = TRUE, eps.Pvalue = sig)
+  
+  switch(type, 
+         "univariate" = cat("(Univariate p values reported)"),
+         "single-step" = cat("(Adjusted p values reported -- single-step method)"),
+         "Shaffer" = cat("(Adjusted p values reported -- Shaffer method)"),
+         "Westfall" = cat("(Adjusted p values reported -- Westfall method)"),
+         cat("(Adjusted p values reported --", type, "method)")
+  )
+  cat("\n\n")
+  if (!is.balanced(x$model)) {
+    cat("\nWARNING: Unbalanced data may lead to poor estimates\n")
+  }
+  invisible(x)                    
 }
 
-#cld.simple.glht <- function(object, decreasing = FALSE, ...) {
-#	multcomp:::cld.summary.glht(object, decreasing = FALSE, ...)
-#}
+TukeyMix <- function(mod, eff, alpha=0.05){
+  object <- Anova(mod,type=3)
+  if(!(eff%in%rownames(object$anova)))
+    stop(paste(eff, ' not among model effects', sep=""))
+  if(eff%in%object$random.effects)
+    stop(paste(eff, ' is random', sep=""))
+  data <- model.frame(mod)
+  effVals <- mod$model[[eff]]
+  effLevs <- sort(levels(effVals))
+  weight  <- 2*eval(parse(text=paste("mean(1/xtabs(~",eff,",data=data))",sep="")))
+  
+  resp    <- response(mod)
+  means   <- tapply(resp,effVals,mean)
+  mname   <- names(means)
+  df      <- object$denom.df[[eff]]
+  error   <- object$errors[match(eff,names(object$denom.df))]
+  SE      <- sqrt(error*weight)
+  quant   <- qtukey(0.95,length(means),df)/sqrt(2)
+  width   <- quant*SE
+  
+  n   <- choose(length(means),2)
+  out <- data.frame(Lower=numeric(n), Diff=numeric(n), Upper=numeric(n), SE=numeric(n), T=numeric(n), 'P(>t)'=numeric(n))
+  rownames(out) <- paste(1:n)
+  k <- 1
+  for(i in 1:(length(means)-1)){
+    for(j in (i+1):length(means)){
+      mij <- means[i]-means[j]
+      p <- ptukey(abs(mij)/(SE/sqrt(2)),length(means),df,lower.tail=FALSE)
+      lower <- mij-width
+      upper <- mij+width
+      out[k,] <- c(lower, mij, upper, SE, mij/SE, p)
+      rownames(out)[k] <- paste(mname[i],'-',mname[j],sep="")
+      k <- k+1
+    }
+  }
+  colnames(out) <- c("Lower", "Center", "Upper", "Std.Err", "t value","P(>t)")
+  attr(out,"minSignDiff") <- width
+  attr(out,"means") <- means
+  attr(out,"alpha") <- alpha
+  attr(out,"effVals") <- effVals
+  attr(out,"resp") <- resp
+  attr(out,"quant") <- quant
+  attr(out,"error") <- SE
+  class(out) <- c("TukeyMix","data.frame")
+  out
+}
+
+
+## CLD
+cld.simple.glht <- function (object, level = 0.05, decreasing = TRUE, ...) {
+  random <- ifelse(is.null(attr(object,'random')),FALSE,TRUE)
+  
+  if(!random){
+    class(object) <- class(object)[-1]
+    ret <- cld(object)
+    ret$object <- 0
+    means <- tapply(ret$y,ret$x,mean)
+    if(decreasing)
+      means <- means[length(means):1]
+    attr(ret$object,"means") <- means
+    ret$lvl_order <- levels(ret$x)[order(means)]
+  } else {
+    object <- object$res
+    signif <- (object[,6] < level)
+    ret <- list()
+    ret$object <- object
+    ret$x <- attr(object, "effVals")
+    ret$y <- attr(object, "resp")
+    means <- tapply(ret$y[1:length(ret$x)], ret$x, mean)
+    if(decreasing)
+      means <- means[length(means):1]
+    ret$lvl_order <- levels(ret$x)[order(means)]
+    K <- contrMat(table(ret$x), type = "Tukey")
+    ret$comps <- cbind(apply(K, 1, function(k) levels(ret$x)[k == 1]), 
+                       apply(K, 1, function(k) levels(ret$x)[k == -1]))
+    
+    ret$signif <- signif
+    ret$mcletters <- insert_absorb(signif, decreasing = decreasing, 
+                                   comps = ret$comps, lvl_order = ret$lvl_order, ...)
+    ret$mcletters$Letters <- ret$mcletters$Letters[levels(ret$x)]
+    ret$mcletters$monospacedLetters <- ret$mcletters$monospacedLetters[levels(ret$x)]
+    ret$mcletters$LetterMatrix <- ret$mcletters$LetterMatrix[levels(ret$x),]
+  }
+  class(ret) <- "cldMix"
+  attr(ret, "level") <- level
+  ret
+}
+
+print.cldMix <- function(x, ...){
+  object    <- x
+  means     <- attr(object$object,"means")
+  n         <- length(means)
+  mname     <- names(means)
+  letters   <- object$mcletters$LetterMatrix
+  lvl_order <- object$lvl_order
+  morder    <- numeric(n)
+  if(class(letters)=="logical"){
+    letters <- as.matrix(letters)
+  }
+  G <- dim(letters)[2]
+  LetterMatrix <- matrix("",nrow=dim(letters)[1],ncol=G)
+  colnames(LetterMatrix) <- paste("G",1:G,sep="")
+
+  for(i in 1:n){
+    morder[i] <- which(lvl_order[i]==mname)
+    for(j in 1:G){
+      if(letters[i,j])
+        LetterMatrix[i,j] <- LETTERS[j]
+    }
+  }
+  out <- data.frame("Mean"=means[morder], LetterMatrix[morder,,drop=FALSE])
+  cat("Tukey's HSD", paste("Alpha:", attr(object,"level")), "", sep="\n")
+  print(out)
+}

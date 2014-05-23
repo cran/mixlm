@@ -2,11 +2,11 @@
 
 \name{lm}
 \alias{lm}
+\alias{summary.lm}
 \alias{lmer}
 \alias{qr.lm}
 \alias{mixlm}
 \alias{print.lm}
-\alias{hijack}
 \alias{random.worker}
 \concept{regression}
 \title{Fitting Linear Models}

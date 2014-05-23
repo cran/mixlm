@@ -1,11 +1,11 @@
-de654f72ce1631b552723eaa75a35520 *DESCRIPTION
-eccc3d562dd2d5de56a13a54e1f65b60 *NAMESPACE
-04a0de3d76e5a127290fcacb4715ca5b *R/borrowed.R
+d416c7dae640621101d95cafb03e6157 *DESCRIPTION
+0aebeed25aa1ba099842a48b18c243d7 *NAMESPACE
+8db337542fe8e8814fe9a3b2394ebc3b *R/borrowed.R
 1168e5fc5168fe249d5c1348ec829943 *R/glm.R
 47699422ed36d6667670c535161b583e *R/globals.R
-3c6e01431a84061277882759ae7d317e *R/lm.R
-27f7a74648d89f548278a9eaf357f519 *R/mixlm.R
-959b1a196e8c6f20cc5e38be84af2566 *R/statistics.R
+ff9c458ea3f996940cf50647d8473235 *R/lm.R
+7a0bee93fdf88376d6bf1eb1c5da5326 *R/mixlm.R
+a094a864f5c5f466da2aa2ef9651e219 *R/statistics.R
 84953158b2528820593c02b280a71285 *R/utilities.R
 9de55b5d7af1d97e5c737257ccfbfdba *man/Anova.Rd
 e71484a94ea5f8be22849b7ac6d1491d *man/AnovaMix.Rd
@@ -20,7 +20,7 @@ e6a82610298df4a59ba7ece80876430a *man/extend.colnames.Rd
 27f7ef06c0cc2532d3d8575c7d753f42 *man/fparse.Rd
 80ae44050a7f94f0967e84c13a2b3f1f *man/glm.Rd
 fbd5aec5b6a2e5900c680fd9a82716b4 *man/is.balanced.Rd
-5e16c80071c681e8ef63e78064c76212 *man/lm.Rd
+6a50c6ce02e7745687b8065a9e778ed0 *man/lm.Rd
 3f7cc7c1bb2ae56cd36c587493eea3c5 *man/plotprops.Rd
 f6347b5984458c8abc968b3844694c47 *man/print.AnovaMix.Rd
 985b22956e328f3b7ffe95bfbbd9d459 *man/print.summary.lm.Rd
