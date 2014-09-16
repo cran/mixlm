@@ -409,7 +409,7 @@ lm <- function (formula, data, subset, weights, na.action,
 	## Edited by KHL
 	if( is.random ){
 		z$random <- rw
-		if(!all(grepl("factor",attr(mt,"dataClasses")[-1]))){
+		if(!all(grepl("factor",attr(mt,"dataClasses")[-1])|grepl("ordered",attr(mt,"dataClasses")[-1]))){
 			stop("Mixed models containing continuous effects not supported")
 		}
 	}

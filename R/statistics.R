@@ -1763,7 +1763,7 @@ print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), ...) 
   invisible(x)                    
 }
 
-TukeyMix <- function(mod, eff, alpha=0.05){
+TukeyMix <- function(mod, eff, level=0.95){
   object <- Anova(mod,type=3)
   if(!(eff%in%rownames(object$anova)))
     stop(paste(eff, ' not among model effects', sep=""))
@@ -1780,7 +1780,7 @@ TukeyMix <- function(mod, eff, alpha=0.05){
   df      <- object$denom.df[[eff]]
   error   <- object$errors[match(eff,names(object$denom.df))]
   SE      <- sqrt(error*weight)
-  quant   <- qtukey(0.95,length(means),df)/sqrt(2)
+  quant   <- qtukey(level,length(means),df)/sqrt(2)
   width   <- quant*SE
   
   n   <- choose(length(means),2)
@@ -1801,41 +1801,40 @@ TukeyMix <- function(mod, eff, alpha=0.05){
   colnames(out) <- c("Lower", "Center", "Upper", "Std.Err", "t value","P(>t)")
   attr(out,"minSignDiff") <- width
   attr(out,"means") <- means
-  attr(out,"alpha") <- alpha
+  attr(out,"level") <- level
   attr(out,"effVals") <- effVals
   attr(out,"resp") <- resp
   attr(out,"quant") <- quant
   attr(out,"error") <- SE
+  attr(out,"df") <- df
   class(out) <- c("TukeyMix","data.frame")
   out
 }
 
 
 ## CLD
-cld.simple.glht <- function (object, level = 0.05, decreasing = TRUE, ...) {
+cld.simple.glht <- function (object, alpha = 0.05, decreasing = TRUE, ...) {
   random <- ifelse(is.null(attr(object,'random')),FALSE,TRUE)
   
   if(!random){
     class(object) <- class(object)[-1]
     ret <- cld(object)
     ret$object <- 0
-    means <- tapply(ret$y,ret$x,mean)
+    means <- sort(tapply(ret$y,ret$x,mean))
     if(decreasing)
-      means <- means[length(means):1]
+      means <- rev(means)
     attr(ret$object,"means") <- means
     ret$lvl_order <- levels(ret$x)[order(means)]
   } else {
     object <- object$res
-    signif <- (object[,6] < level)
+    signif <- (object[,6] < alpha)
     ret <- list()
     ret$object <- object
     ret$x <- attr(object, "effVals")
     ret$y <- attr(object, "resp")
-    means <- tapply(ret$y[1:length(ret$x)], ret$x, mean)
-    if(decreasing)
-      means <- means[length(means):1]
-    ret$lvl_order <- levels(ret$x)[order(means)]
-    K <- contrMat(table(ret$x), type = "Tukey")
+    means <- sort(tapply(ret$y[1:length(ret$x)], ret$x, mean))
+    ret$lvl_order <- names(means)[order(means)]
+	K <- contrMat(table(ret$x), type = "Tukey")
     ret$comps <- cbind(apply(K, 1, function(k) levels(ret$x)[k == 1]), 
                        apply(K, 1, function(k) levels(ret$x)[k == -1]))
     
@@ -1845,13 +1844,18 @@ cld.simple.glht <- function (object, level = 0.05, decreasing = TRUE, ...) {
     ret$mcletters$Letters <- ret$mcletters$Letters[levels(ret$x)]
     ret$mcletters$monospacedLetters <- ret$mcletters$monospacedLetters[levels(ret$x)]
     ret$mcletters$LetterMatrix <- ret$mcletters$LetterMatrix[levels(ret$x),]
+    if(decreasing){
+	  ret$lvl_order <- names(means)[rev(order(means))]
+	} else {
+	  ret$lvl_order <- names(means)[order(means)]
+	}
   }
   class(ret) <- "cldMix"
-  attr(ret, "level") <- level
+  attr(ret, "alpha") <- alpha
   ret
 }
 
-print.cldMix <- function(x, ...){
+print.cldMix <- function(x, fill=TRUE, ...){
   object    <- x
   means     <- attr(object$object,"means")
   n         <- length(means)
@@ -1874,6 +1878,59 @@ print.cldMix <- function(x, ...){
     }
   }
   out <- data.frame("Mean"=means[morder], LetterMatrix[morder,,drop=FALSE])
-  cat("Tukey's HSD", paste("Alpha:", attr(object,"level")), "", sep="\n")
+  if(fill){
+	for(i in 2:dim(out)[2]){ # Loop over groups
+		first <- match(LETTERS[i-1], out[,i])
+		last  <- match(LETTERS[i-1], rev(out[,i]))
+		out[first:(dim(out)[1]-last+1),i] <- LETTERS[i-1]
+	}
+  }
+  cat("Tukey's HSD", paste("Alpha:", attr(object,"alpha")), "", sep="\n")
   print(out)
+}
+
+
+##########################
+# CI for the grand mean of a linear model
+CIgrandMean <- function(object, alpha=0.05){
+	# Retrieve model
+	opt <- options("contrasts")
+	options(contrasts=c('contr.sum','contr.poly'))
+	noRandom <- update(object)
+	noRandom$random <- NULL
+	model <- as.data.frame(Anova(noRandom, type='II', singular.ok=TRUE))
+    options(contrasts=opt$contrasts)
+	
+	n.eff <- dim(model)[1]-1
+	model <- model[-(n.eff+1),]
+	
+	if(n.eff > 1){ # More than one model effect
+		effects <- rownames(model)
+		
+		X <- matrix(0, nrow=n.eff, ncol=n.eff+1)
+		X[,n.eff+1] <- 1
+		for(i in 1:n.eff){
+			X[i,i] <- 1
+			splat <- strsplit(effects[i], ":")[[1]]
+			if(length(splat) > 1){ # Interaction effect
+				for(j in 1:length(splat)){
+					X[i,match(splat[j], effects)] <- 1
+				}
+			}
+		}
+		C <- rref(X)[,n.eff+1]
+	} else {
+		X <- NULL
+		C <- 1
+	}
+	MS <- model[,3]%*%C
+	v  <- sum(model[,"Mean Sq"]*C)^2/sum((model[,"Mean Sq"]*C)^2/model[,"Df"])
+	CI <- mean(response(object)) + c(1,0,-1)*qt(alpha/2, v)*sqrt(MS/length(response(object)))
+	class(CI) <- "CIgm"
+	attr(CI, "alpha") <- alpha
+	CI
+}
+print.CIgm <- function(x, ...){
+	cat(100*(1-attr(x,"alpha")), "% confidence interval for the grand mean (",x[2],")\n", sep="")
+	cat("(", x[1], ", ", x[3], ")\n", sep="")
 }

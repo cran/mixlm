@@ -6,6 +6,7 @@ import(car)
 importFrom(pls,plsr)
 importFrom(multcomp,glht)
 importFrom(multcomp,cld)
+importFrom(pracma,rref)
 
 export(
     Anova,
@@ -15,6 +16,7 @@ export(
     best.subsets,
     confusion,
     ConjComp,
+	CIgrandMean,
     effect.labels,
     extend.colnames,
     forward,
@@ -28,6 +30,7 @@ export(
     PRESS.pred,
     PRESS.res,
     print.AnovaMix,
+	print.CIgm,
     print.simple.glht,
     print.summary.lm,
     prop.test.ordinary,
