@@ -1,8 +1,8 @@
 Package: mixlm
 Type: Package
-Title: Mixed model ANOVA and statistics for education
-Version: 1.0.6
-Date: 2014-09-16
+Title: Mixed Model ANOVA and Statistics for Education
+Version: 1.0.7
+Date: 2014-11-09
 Author: Kristian Hovde Liland, Solve Sæbø
 Maintainer: Kristian Hovde Liland <kristian.liland@nmbu.no>
 Encoding: latin1
@@ -12,7 +12,7 @@ Imports: leaps, lme4, car
 License: GPL
 LazyLoad: yes
 LazyData: yes
-Packaged: 2014-09-16 08:25:28 UTC; kristian.liland
+Packaged: 2014-11-09 20:59:51 UTC; kristian.liland
 NeedsCompilation: no
 Repository: CRAN
-Date/Publication: 2014-09-16 12:04:23
+Date/Publication: 2014-11-10 01:44:43

@@ -381,10 +381,10 @@ lm <- function (formula, data, subset, weights, na.action,
 	x <- model.matrix(mt, mf, contrasts)
 	## Edited by KHL
 	if(is.null(contrasts) && (options("contrasts")[[1]][1]!="contr.treatment" || options("contrasts")[[1]][1]!="contr.poly") && !missing(data)){
-		col.names   <- effect.labels(mt,data) # mt er "terms" fra formula, x er model.matrix
+		col.names   <- effect.labels(mt,mf) # mt er "terms" fra formula, x er model.matrix
 		if(length(col.names)==length(colnames(x))){
-			colnames(x) <- effect.labels(mt,data)
-      effect.sources <- effect.source(mt,data)
+			colnames(x) <- effect.labels(mt,mf)
+			effect.sources <- effect.source(mt,data)
 		}
 	}
 	## End edit
