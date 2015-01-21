@@ -20,6 +20,9 @@
 \code{summary} method for class \code{"lm"}.
 }
 \details{
+  This adaptation of \code{print.summary.lm} from package \code{stats}
+  slightly alters the output to better conform with text-book notation.
+  
   \code{print.summary.lm} tries to be smart about formatting the
   coefficients, standard errors, etc. and additionally gives
   \sQuote{significance stars} if \code{signif.stars} is \code{TRUE}.

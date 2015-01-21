@@ -9,7 +9,9 @@
 \description{
   \code{glm} is used to fit generalized linear models, specified by
   giving a symbolic description of the linear predictor and a
-  description of the error distribution. \code{glm} parses to \code{glmer} for mixed modelling.
+  description of the error distribution. 
+  The version of \code{glm} supplied by the package \code{mixlm}
+  parses to \code{glmer} for mixed modelling.
 }
 \usage{
 glm(formula, family = gaussian, data, weights, subset,
@@ -319,7 +321,6 @@ treatment <- gl(3,3)
 print(d.AD <- data.frame(treatment, outcome, counts))
 glm.D93 <- glm(counts ~ outcome + treatment, family=poisson())
 anova(glm.D93)
-\donttest{summary(glm.D93)}
 
 # A Gamma example, from McCullagh & Nelder (1989, pp. 300-2)
 clotting <- data.frame(
@@ -334,9 +335,7 @@ dataset   <- data.frame(y=rnorm(8), x=factor(c(rep(1,4),rep(0,4))), z=factor(rep
 GLM       <- glm(y  ~ x+r(z), family=gaussian(identity), data=dataset)
 summary(GLM)
 logLik(GLM)
-\dontrun{
 Anova(GLM,type=3)
-}
 
 \dontrun{
 ## for an example of the use of a terms object as a formula

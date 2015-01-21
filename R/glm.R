@@ -1,4 +1,9 @@
-# This function replaces stats::glm, organizes fixed and random effects, removes r() from formula and parses to glmer.
+##
+## This file contains a MODIFIED COPY (2014) of the glm method from the base package stats (2014-10-31).
+##
+
+# The function replaces stats::glm, organizes fixed and random effects, removes r() from formula and parses to glmer.
+# 
 glm <- function(formula, family = gaussian, data, weights,
 		subset, na.action, start = NULL,
 		etastart, mustart, offset,
@@ -74,7 +79,7 @@ glm <- function(formula, family = gaussian, data, weights,
     ## null model support
     if (!is.empty.model(mt)){
 		X <- model.matrix(mt, mf, contrasts)
-		## Edited by KHL
+		## Edited by KHL 
 		if(is.null(contrasts) && (options("contrasts")[[1]][1]!="contr.treatment" || options("contrasts")[[1]][1]!="contr.poly") && !missing(data)){
 			col.names   <- effect.labels(mt,data)
 			if(length(col.names)==length(colnames(X))){

@@ -1,5 +1,5 @@
 \name{prop.test.ordinary}
-\title{Test of Equal or Given Proportions in text book version}
+\title{Test of Equal or Given Proportions in text-book version}
 \usage{
 prop.test.ordinary(x, n, p = NULL,
           alternative = c("two.sided", "less", "greater"),
@@ -31,6 +31,9 @@ prop.test.ordinary(x, n, p = NULL,
     deviation should be used..}
 }
 \description{
+  This adaptation of \code{prop.test} from package \code{stats}
+  strips the test down to a text-book version.
+  
   \code{prop.test} can be used for testing the null that the
   proportions (probabilities of success) in several groups are the
   same, or that they equal certain given values.

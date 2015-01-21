@@ -1,4 +1,9 @@
-# This function replaces stats::lm, organizes fixed and random effects, removes r() from formula and parses to lm or lmer.
+##
+## This file contains MODIFIED COPIES of the lm, summary.lm, confint.lm and anova.lm methods from the base package stats (2014-10-31),
+## and Anova.lm from the package car (2014-10-10).
+##
+
+# The lm function replaces stats::lm, organizes fixed and random effects, removes r() from formula and parses to lm or lmer.
 
 # ANOVA (sequential SS)
 #anova.lm <- function(object,...){

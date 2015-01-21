@@ -19,7 +19,8 @@
 Analysis of variance with SS type II or III (including mixed models).
 }
 \description{
-Replacement for \code{Anova.lm} in package \code{car}.
+Replacement for \code{Anova.lm} in package \code{car}. This
+version adds support for random effects when needed.
 }
 \usage{
 \method{Anova}{lm}(mod, error, type = c("II", "III", 2, 3), white.adjust

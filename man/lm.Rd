@@ -20,6 +20,7 @@
   extends the capabilities with balanced mixture
   models and \code{lmer} interfacing. Random effects 
   are indicated by wrapping their formula entries in \code{r()}.
+  Also, effect level names are kept in printing.
 }
 \usage{
 lm(formula, data, subset, weights, na.action,
@@ -249,10 +250,9 @@ group <- gl(2,10,20, labels=c("Ctl","Trt"))
 weight <- c(ctl, trt)
 lm.D9 <- lm(weight ~ group)
 lm.D90 <- lm(weight ~ group - 1) # omitting intercept
-\donttest{
 anova(lm.D9)
 summary(lm.D90)
-}
+
 opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
 plot(lm.D9, las = 1)      # Residuals, Fitted, ...
 par(opar)
