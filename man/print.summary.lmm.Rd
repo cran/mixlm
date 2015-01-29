@@ -1,14 +1,14 @@
-\name{print.summary.lm}
-\alias{print.summary.lm}
+\name{print.summary.lmm}
+\alias{print.summary.lmm}
 \title{Summarizing Linear Model Fits}
 \usage{
-\method{print}{summary.lm}(x, digits = max(3, getOption("digits") - 3),
+\method{print}{summary.lmm}(x, digits = max(3, getOption("digits") - 3),
       symbolic.cor = x$symbolic.cor,
       signif.stars = getOption("show.signif.stars"), \dots)
 }
 \arguments{
-  \item{x}{an object of class \code{"summary.lm"}, usually, a result of a
-    call to \code{summary.lm}.}
+  \item{x}{an object of class \code{"summary.lmm"}, usually, a result of a
+    call to \code{summary.lmm}.}
   \item{digits}{the number of significant digits to use when printing.}
   \item{symbolic.cor}{logical. If \code{TRUE}, print the correlations in
     a symbolic form (see \code{\link{symnum}}) rather than as numbers.}
@@ -17,7 +17,7 @@
   \item{\dots}{further arguments passed to or from other methods.}
 }
 \description{
-\code{summary} method for class \code{"lm"}.
+\code{summary} method for class \code{"lmm"}.
 }
 \details{
   This adaptation of \code{print.summary.lm} from package \code{stats}

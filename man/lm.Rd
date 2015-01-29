@@ -2,11 +2,11 @@
 
 \name{lm}
 \alias{lm}
-\alias{summary.lm}
+\alias{summary.lmm}
 \alias{lmer}
-\alias{qr.lm}
+\alias{qr.lmm}
 \alias{mixlm}
-\alias{print.lm}
+\alias{print.lmm}
 \alias{random.worker}
 \concept{regression}
 \title{Fitting Linear Models}
@@ -132,7 +132,7 @@ lm(formula, data, subset, weights, na.action,
   \code{data} and then in the environment of \code{formula}.
 }
 \value{
-  \code{lm} returns an object of \code{\link{class}} \code{"lm"} or for
+  \code{lm} returns an object of \code{\link{class}} \code{c("lmm","lm")} or for
   multiple responses of class \code{c("mlm", "lm")}.
 
   The functions \code{summary} and \code{\link{anova}} are used to
@@ -189,7 +189,7 @@ lm(formula, data, subset, weights, na.action,
   values are time series.
 }
 \seealso{
-  \code{\link{summary.lm}} for summaries and \code{\link{anova.lm}} for
+  \code{\link{summary.lmm}} for summaries and \code{\link{anova.lmm}} for
   the ANOVA table; \code{\link{aov}} for a different interface.
 
   The generic functions \code{\link{coef}}, \code{\link{effects}},

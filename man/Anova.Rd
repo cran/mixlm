@@ -1,19 +1,6 @@
-\name{Anova.lm}
-\alias{Anova.lm}
-\alias{Anova.II.lm}
-\alias{Anova.III.lm}
-\alias{ConjComp}
-\alias{has.intercept}
-\alias{has.intercept.default}
-\alias{has.intercept.matrix}
-\alias{response}
-\alias{response.default}
-\alias{responseName}
-\alias{responseName.default}
-\alias{relatives}
-\alias{term.names}
-\alias{term.names.default}
+\name{Anova.lmm}
 \alias{Anova}
+\alias{Anova.lmm}
 \encoding{latin1}
 \title{
 Analysis of variance with SS type II or III (including mixed models).
@@ -23,9 +10,9 @@ Replacement for \code{Anova.lm} in package \code{car}. This
 version adds support for random effects when needed.
 }
 \usage{
-\method{Anova}{lm}(mod, error, type = c("II", "III", 2, 3), white.adjust
+\method{Anova}{lmm}(mod, error, type = c("II", "III", 2, 3), white.adjust
  = c(FALSE, TRUE, "hc3", "hc0", "hc1", "hc2", "hc4"),
- singular.ok, ...)
+ vcov. = NULL, singular.ok, ...)
 }
 \arguments{
   \item{mod}{\code{lm}, \code{aov}, \code{glm}, \code{multinom}, \code{polr}
@@ -35,6 +22,11 @@ version adds support for random effects when needed.
     F-tests for a generalized linear model, a \code{glm} object from which the
     dispersion is to be estimated. If not specified, \code{mod} is used.}
   \item{type}{type of test, \code{"II"}, \code{"III"}, \code{2}, or \code{3}.}
+  \item{vcov.}{in the \code{default} method, an optional coefficient-covariance matrix or
+    function to compute a covariance matrix, computed by default by applying the 
+    generic \code{vcov} function to the model object. A similar argument may be supplied
+    to the lm method, and the default (\code{NULL}) is to ignore the argument; if both
+    \code{vcov.} and \code{white.adjust} are supplied to the \code{lm} method, the latter is used.}
   \item{singular.ok}{defaults to \code{TRUE} for type-II tests, and \code{FALSE}
     for type-III tests (where the tests for models with aliased coefficients
     will not be straightforwardly interpretable); 

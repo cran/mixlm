@@ -1,6 +1,5 @@
-\name{anova.lm}
-\alias{anova.lm}
-\alias{anova.lmlist}
+\name{anova.lmm}
+\alias{anova.lmm}
 \alias{anova}
 \encoding{latin1}
 \title{
@@ -11,7 +10,7 @@ Wrapper for \code{anova.lm} in package \code{stats} that halts execution
 if unsupported input is detected.
 }
 \usage{
-\method{anova}{lm}(object, ...)
+\method{anova}{lmm}(object, ...)
 }
 \arguments{
   \item{object}{object fitted by \code{lm}, \code{lmer} or similar.}
