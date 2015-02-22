@@ -1750,6 +1750,14 @@ cld.simple.glht <- function (object, alpha = 0.05, decreasing = TRUE, ...) {
     attr(ret$object,"means") <- means
     ret$lvl_order <- levels(ret$x)[order(means)]
   } else {
+    # Catch failed Tukey
+    if(is.nan(attributes(object$res)$quant)){
+	  warning('Tukey\'s HSD failed')
+	  ret <- 0
+	  attr(ret,"failed") <- TRUE
+	  class(ret) <- "cldMix"
+	  return(ret)
+    }
     object$test <- list()
     object$test$pvalues <- object$res[,6]
     class(object) <- class(object)[-1]
@@ -1764,16 +1772,27 @@ cld.simple.glht <- function (object, alpha = 0.05, decreasing = TRUE, ...) {
   }
   class(ret) <- "cldMix"
   attr(ret, "alpha") <- alpha
+	  attr(ret,"failed") <- FALSE
   ret
 }
 
 print.cldMix <- function(x, fill=TRUE, ...){
+  # Graceful output if failed Tukey
+  if(attr(x,"failed")){
+    cat("No CLD available\n")
+	return(invisible(NULL))
+  }
+
   object    <- x
   means     <- attr(object$object,"means")
   n         <- length(means)
   mname     <- names(means)
   letters   <- object$mcletters$LetterMatrix
-  lvl_order <- object$lvl_order
+  if(is.null(dim(letters))){
+	lvl_order <- names(letters)
+  } else {
+    lvl_order <- rownames(letters) #object$lvl_order
+  }
   morder    <- numeric(n)
   if(class(letters)=="logical"){
     letters <- as.matrix(letters)
@@ -1783,13 +1802,13 @@ print.cldMix <- function(x, fill=TRUE, ...){
   colnames(LetterMatrix) <- paste("G",1:G,sep="")
   
   for(i in 1:n){
-    morder[i] <- which(lvl_order[i]==mname)
+    morder[i] <- which(lvl_order==mname[i])
     for(j in 1:G){
       if(letters[i,j])
         LetterMatrix[i,j] <- LETTERS[j]
     }
   }
-  out <- data.frame("Mean"=means[morder], LetterMatrix[morder,,drop=FALSE])
+  out <- data.frame("Mean"=means, LetterMatrix[morder,,drop=FALSE])
   if(fill){
     for(i in 2:dim(out)[2]){ # Loop over groups
       first <- match(LETTERS[i-1], out[,i])
