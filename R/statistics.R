@@ -613,12 +613,13 @@ t_test_sum <- function(means, sds, ns, alternative = c("two.sided", "less", "gre
     estimate <- c(mx,my)
     names(estimate) <- c("mean of x","mean of y")
     if(var.equal) {
-      df <- ifelse(z.test,Inf,nx+ny-2)
+	  df <- nx+ny-2
       v <- 0
       if(nx > 1) v <- v + (nx-1)*vx
       if(ny > 1) v <- v + (ny-1)*vy
       v <- v/df
       stderr <- sqrt(v*(1/nx+1/ny))
+	  df <- ifelse(z.test,Inf,nx+ny-2)
     } else {
       stderrx <- sqrt(vx/nx)
       stderry <- sqrt(vy/ny)
