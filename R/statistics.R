@@ -267,7 +267,7 @@ PRESS.res <- function(object=NULL, ncomp=NULL) {
   if(is.null(object) && "package:Rcmdr"%in%search()){
     try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
   }
-  if(class(object)[1]=="lm" || class(objects)[1]=="glm"){
+  if(class(object)[1]=="lm" || class(object)[1]=="lmm" || class(objects)[1]=="glm"){
     return(residuals(object)/(1-lm.influence(object)$hat))
   }
   if(class(object)[1]=="mvr"){
@@ -292,7 +292,7 @@ PRESS.pred <- function(object=NULL, ncomp=NULL) {
   if(is.null(object)){
     try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
   }
-  if(class(object)[1]=="lm" || class(objects)[1]=="glm"){
+  if(class(object)[1]=="lm" || class(object)[1]=="lmm" || class(objects)[1]=="glm"){
     return(model.response(model.frame(object)) - residuals(object)/(1-lm.influence(object)$hat))
   }
   if(class(object)[1]=="mvr"){
@@ -332,7 +332,7 @@ PRESS <- function(object=NULL) {
     comp0 <- temp.model$validation$PRESS0; names(comp0) <- "(intercept)"
     the.PRESS <- c(comp0,temp.model$validation$PRESS[1,])
   }
-  if(class(object)=="lm"){ # Linear regression
+  if(class(object)[1]=="lm" || class(object)[1]=="lmm"){ # Linear regression
     the.PRESS <- sum(residuals(object)^2/(1-lm.influence(object)$hat)^2)
   }
   the.PRESS
@@ -356,7 +356,7 @@ R2pred <- function(object=NULL) {
     comp0 <- temp.model$validation$PRESS0; names(comp0) <- "(intercept)"
     R2pred <- 1-c(comp0,temp.model$validation$PRESS[1,])/((n-1)*var(temp.model$model[,1]))
   }
-  if(class(object)=="lm"){ # Linear regression
+  if(class(object)[1]=="lm" || class(object)[1]=="lmm"){ # Linear regression
     R2pred <- 1 - sum(residuals(object)^2/(1-lm.influence(object)$hat)^2) /
       (var(object$model[,1])*(length(object$model[,1])-1))
   }
@@ -408,7 +408,7 @@ RMSEP <- function(object){
   if(class(object)=="mvr"){ # PCR/PLSR
     the.RMSEP <- pls::RMSEP(object, estimate="all")
   }
-  if(class(object)=="lm"){ # Linear regression
+  if(class(object)[1]=="lmm" || class(object)[1]=="lm"){ # Linear regression
     the.RMSEP <- sqrt(mean(residuals(object)^2/(1-lm.influence(object)$hat)^2))
   }
   the.RMSEP
@@ -1463,6 +1463,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
   if(missing(corr)){
     corr <- "Tukey"
   }
+  mod <- aov(mod)
   random <- ifelse(is.null(mod$random),FALSE,TRUE)
   if(random){
     if(corr!="Tukey")

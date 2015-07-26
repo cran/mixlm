@@ -415,7 +415,11 @@ lm <- function (formula, data, subset, weights, na.action,
                                singular.ok=singular.ok, ...)
     else lm.wfit(x, y, w, offset = offset, singular.ok=singular.ok, ...)
   }
-  class(z) <- c(if(is.matrix(y)) "mlm", "lm")
+    if(is.matrix(y)){
+      class(z) <- c( "mlm")
+    } else {
+      class(z) <- c( "lmm", "lm")
+    }
   z$na.action <- attr(mf, "na.action")
   z$offset <- offset
   z$contrasts <- attr(x, "contrasts")
@@ -434,11 +438,6 @@ lm <- function (formula, data, subset, weights, na.action,
     z$random <- rw
     if(!all(grepl("factor",attr(mt,"dataClasses")[-1])|grepl("ordered",attr(mt,"dataClasses")[-1]))){
       stop("Mixed models containing continuous effects not supported")
-    }
-    if(is.matrix(y)){
-      class(z) <- c( "mlm")
-    } else {
-      class(z) <- c( "lmm", "lm")
     }
   }
   if(exists("effect.sources") && !is.null(effect.sources))
@@ -607,7 +606,7 @@ summary.lmm <- function (object, correlation = FALSE, symbolic.cor = FALSE, ...)
   if(!is.null(object$random) && !is.balanced(object)){
     cat("\nWARNING: Unbalanced data may lead to poor estimates\n")
   }
-  class(ans) <- "summary.lm"
+  class(ans) <- "summary.lmm"
   ans
 }
 

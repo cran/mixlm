@@ -7,7 +7,16 @@ importFrom(pls,plsr)
 importFrom(multcomp,glht)
 importFrom(multcomp,cld)
 importFrom(pracma,rref)
-
+importFrom("graphics", "axis", "box", "mtext", "par", "plot", "points")
+importFrom("stats", ".getXlevels", "add1", "anova", "aov",
+           "as.formula", "coef", "complete.cases", "cov", "drop.scope",
+           "drop1", "formula", "gaussian", "hatvalues",
+           "is.empty.model", "lm.fit", "lm.influence", "lm.wfit",
+           "model.extract", "model.frame", "model.matrix",
+           "model.offset", "model.response", "model.weights",
+           "naprint", "pchisq", "pf", "pnorm", "printCoefmat", "pt",
+           "ptukey", "qnorm", "qt", "qtukey", "quantile", "residuals",
+           "symnum", "terms", "update", "var", "vcov")
 export(
     Anova,
     anova_reg,
