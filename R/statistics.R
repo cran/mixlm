@@ -318,7 +318,7 @@ PRESS <- function(object=NULL) {
     try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
   }
   the.PRESS <- NULL
-  if(class(object)=="mvr"){ # PCR/PLSR
+  if(class(object)[1]=="mvr"){ # PCR/PLSR
     temp.model <- object
     hasVal <- !is.null(temp.model$validation)
     hasLOO <- logical(0)
@@ -342,7 +342,7 @@ R2pred <- function(object=NULL) {
     try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
   }
   R2pred <- NULL
-  if(class(object)=="mvr"){ # PCR/PLSR
+  if(class(object)[1]=="mvr"){ # PCR/PLSR
     temp.model <- object
     hasVal <- !is.null(temp.model$validation)
     hasLOO <- logical(0)
@@ -405,7 +405,7 @@ RMSEP <- function(object){
     try(eval(parse(text=paste("object <- ", activeModel(), sep=""))))
   }
   the.RMSEP <- NULL
-  if(class(object)=="mvr"){ # PCR/PLSR
+  if(class(object)[1]=="mvr"){ # PCR/PLSR
     the.RMSEP <- pls::RMSEP(object, estimate="all")
   }
   if(class(object)[1]=="lmm" || class(object)[1]=="lm"){ # Linear regression
@@ -466,7 +466,7 @@ prop.test.ordinary <- function (x, n, p = NULL, alternative = c("two.sided", "le
   if (k > 2 || (k == 2) && !is.null(p)) 
     alternative <- "two.sided"
   if ((length(conf.level) != 1L) || is.na(conf.level) || (conf.level <= 
-                                                            0) || (conf.level >= 1)) 
+                                                          0) || (conf.level >= 1)) 
     stop("'conf.level' must be a single number between 0 and 1")
   correct <- as.logical(correct)
   ESTIMATE <- x/n
@@ -577,8 +577,8 @@ t_test_sum <- function(means, sds, ns, alternative = c("two.sided", "less", "gre
   if(!missing(mu) && (length(mu) != 1 || is.na(mu)))
     stop("'mu' must be a single number")
   if(!missing(conf.level) &&
-       (length(conf.level) != 1 || !is.finite(conf.level) ||
-          conf.level < 0 || conf.level > 1))
+     (length(conf.level) != 1 || !is.finite(conf.level) ||
+      conf.level < 0 || conf.level > 1))
     stop("'conf.level' must be a single number between 0 and 1")
   if( length(means)==2 ) {
     dname <- "two samples"#paste(deparse(substitute(x)),"and",
@@ -613,13 +613,13 @@ t_test_sum <- function(means, sds, ns, alternative = c("two.sided", "less", "gre
     estimate <- c(mx,my)
     names(estimate) <- c("mean of x","mean of y")
     if(var.equal) {
-	  df <- nx+ny-2
+      df <- nx+ny-2
       v <- 0
       if(nx > 1) v <- v + (nx-1)*vx
       if(ny > 1) v <- v + (ny-1)*vy
       v <- v/df
       stderr <- sqrt(v*(1/nx+1/ny))
-	  df <- ifelse(z.test,Inf,nx+ny-2)
+      df <- ifelse(z.test,Inf,nx+ny-2)
     } else {
       stderrx <- sqrt(vx/nx)
       stderry <- sqrt(vy/ny)
@@ -698,8 +698,8 @@ z_test.default <- function(x, y = NULL, alternative = c("two.sided", "less", "gr
   if(!missing(mu) && (length(mu) != 1 || is.na(mu)))
     stop("'mu' must be a single number")
   if(!missing(conf.level) &&
-       (length(conf.level) != 1 || !is.finite(conf.level) ||
-          conf.level < 0 || conf.level > 1))
+     (length(conf.level) != 1 || !is.finite(conf.level) ||
+      conf.level < 0 || conf.level > 1))
     stop("'conf.level' must be a single number between 0 and 1")
   if( !is.null(y) ) {
     dname <- paste(deparse(substitute(x)),"and",
@@ -808,8 +808,8 @@ t_test.default <-
     if(!missing(mu) && (length(mu) != 1 || is.na(mu)))
       stop("'mu' must be a single number")
     if(!missing(conf.level) &&
-         (length(conf.level) != 1 || !is.finite(conf.level) ||
-            conf.level < 0 || conf.level > 1))
+       (length(conf.level) != 1 || !is.finite(conf.level) ||
+        conf.level < 0 || conf.level > 1))
       stop("'conf.level' must be a single number between 0 and 1")
     if( !is.null(y) ) {
       dname <- paste(deparse(substitute(x)),"and",
@@ -1051,426 +1051,19 @@ tally <- function(x){
 }
 
 
-# #################################################
-# ## Bonferroni
-# Bonferroni <-
-# function(x, which, ordered = TRUE, conf.level = 0.95, ...)
-# UseMethod("Bonferroni")
-
-# #################################################
-# ## Bonferroni
-# Bonferroni.lm <-
-# function(x, which = seq_along(tabs), ordered = TRUE,
-# conf.level = 0.95, ...)
-# {
-# xc <- x$call
-# x <- aov(x)
-# x$call <- xc
-# mm <- model.tables(x, "means")
-# if(is.null(mm$n))
-# stop("no factors in the fitted model")
-# tabs <- mm$tables[-1L]
-# tabs <- tabs[which]
-# ## mm$n need not be complete -- factors only -- so index by names
-# nn <- mm$n[names(tabs)]
-# nn_na <- is.na(nn)
-# if(all(nn_na))
-# stop("'which' specified no factors")
-# if(any(nn_na)) {
-# warning("'which' specified some non-factors which will be dropped")
-# tabs <- tabs[!nn_na]
-# nn <- nn[!nn_na]
-# }
-# out <- vector("list", length(tabs))
-# names(out) <- names(tabs)
-# MSE <- sum(resid(x)^2, na.rm=TRUE)/x$df.residual
-# for (nm in names(tabs)) {
-# tab <- tabs[[nm]]
-# means <- as.vector(tab)
-# nms <- if(length(d <- dim(tab)) > 1L) {
-# dn <- dimnames(tab)
-# apply(do.call("expand.grid", dn), 1L, paste, collapse=":")
-# } else names(tab)
-# n <- nn[[nm]]
-# ## expand n to the correct length if necessary
-# if (length(n) < length(means)) n <- rep.int(n, length(means))
-# if (as.logical(ordered)) {
-# ord <- order(means)
-# means <- means[ord]
-# n <- n[ord]
-# if (!is.null(nms)) nms <- nms[ord]
-# }
-# center <- outer(means, means, "-")
-# keep <- lower.tri(center)
-# center <- center[keep]
-# width <- qt(1-(1-conf.level)/(2*sum(keep)), x$df.residual) *
-# sqrt((MSE) * outer(1/n, 1/n, "+"))[keep]
-# est <- center/(sqrt((MSE) * outer(1/n, 1/n, "+"))[keep])
-# pvals <- p.adjust(pt(abs(est),x$df.residual,lower.tail=FALSE)*2,"bonferroni")
-# dnames <- list(NULL, c("diff", "lwr", "upr","p adj"))
-# if (!is.null(nms)) dnames[[1L]] <- outer(nms, nms, paste, sep = "-")[keep]
-# out[[nm]] <- array(c(center, center - width, center + width,pvals),
-# c(length(width), 4), dnames)
-# }
-# class(out) <- c("multicomp", "Bonferroni")
-# attr(out, "orig.call") <- x$call
-# attr(out, "conf.level") <- conf.level
-# attr(out, "ordered") <- ordered
-# attr(out, "data") <- x$model
-# if(!is.balanced()){
-# cat("\nWARNING: Unbalanced data may lead to poor estimates\n")
-# }
-# out
-# }
-
-# #################################################
-# #### Bonferroni
-# print.Bonferroni <- function(x, digits=getOption("digits"), ...)
-# {
-# cat("  Bonferroni multiple comparisons of means\n")
-# cat("    ", format(100*attr(x, "conf.level"), 2),
-# "% family-wise confidence level\n", sep="")
-# if (attr(x, "ordered"))
-# cat("    factor levels have been ordered\n")
-# cat("\nFit: ", deparse(attr(x, "orig.call"), 500), "\n\n", sep="")
-# xx <- unclass(x)
-# attr(xx, "data") <- attr(xx, "orig.call") <- attr(xx, "conf.level") <- attr(xx, "ordered") <- NULL
-# xx[] <- lapply(xx, function(z, digits)
-# {z[, "p adj"] <- round(z[, "p adj"], digits); z},
-# digits=digits)
-# print.default(xx, digits, ...)
-# invisible(x)
-# }
-
-# #################################################
-# #### Bonferroni
-# plot.Bonferroni <- function (x, ...)
-# {
-# for (i in seq_along(x)) {
-# xi <- x[[i]][, -4, drop=FALSE] # drop p-values
-# yvals <- nrow(xi):1
-# plot(c(xi[, "lwr"], xi[, "upr"]), rep.int(yvals, 2), type = "n",
-# axes = FALSE, xlab = "", ylab = "", ...)
-# axis(1, ...)
-# axis(2, at = nrow(xi):1, labels = dimnames(xi)[[1L]],
-# srt = 0, ...)
-# abline(h = yvals, lty = 1, lwd = 0.5, col = "lightgray")
-# abline(v = 0, lty = 2, lwd = 0.5, ...)
-# segments(xi[, "lwr"], yvals, xi[, "upr"], yvals, ...)
-# segments(as.vector(xi), rep.int(yvals - 0.1, 3), as.vector(xi),
-# rep.int(yvals + 0.1, 3), ...)
-# title(main = paste(format(100 * attr(x, "conf.level"),
-# 2), "% family-wise confidence level\n", sep = ""),
-# xlab = paste("Differences in mean levels of", names(x)[i]))
-# box()
-# }
-# }
-
-# #################################################
-# #### Fisher
-# Fisher <-
-# function(x, which, ordered = TRUE, conf.level = 0.95, ...)
-# UseMethod("Fisher")
-
-# #################################################
-# #### Fisher
-# Fisher.lm <-
-# function(x, which = seq_along(tabs), ordered = TRUE,
-# conf.level = 0.95, ...)
-# {
-# xc <- x$call
-# x <- aov(x)
-# x$call <- xc
-# mm <- model.tables(x, "means")
-# if(is.null(mm$n))
-# stop("no factors in the fitted model")
-# tabs <- mm$tables[-1L]
-# tabs <- tabs[which]
-# ## mm$n need not be complete -- factors only -- so index by names
-# nn <- mm$n[names(tabs)]
-# nn_na <- is.na(nn)
-# if(all(nn_na))
-# stop("'which' specified no factors")
-# if(any(nn_na)) {
-# warning("'which' specified some non-factors which will be dropped")
-# tabs <- tabs[!nn_na]
-# nn <- nn[!nn_na]
-# }
-# out <- vector("list", length(tabs))
-# names(out) <- names(tabs)
-# MSE <- sum(resid(x)^2, na.rm=TRUE)/x$df.residual
-# n.means <- 0
-# for (nm in names(tabs)) {
-# tab <- tabs[[nm]]
-# means <- as.vector(tab)
-# nms <- if(length(d <- dim(tab)) > 1L) {
-# dn <- dimnames(tab)
-# apply(do.call("expand.grid", dn), 1L, paste, collapse=":")
-# } else names(tab)
-# n <- nn[[nm]]
-# ## expand n to the correct length if necessary
-# if (length(n) < length(means)) n <- rep.int(n, length(means))
-# if (as.logical(ordered)) {
-# ord <- order(means)
-# means <- means[ord]
-# n <- n[ord]
-# if (!is.null(nms)) nms <- nms[ord]
-# }
-# n.means <- n.means+length(means)
-# center <- outer(means, means, "-")
-# keep <- lower.tri(center)
-# center <- center[keep]
-# width <- qt(1-(1-conf.level)/2, x$df.residual) *
-# sqrt((MSE) * outer(1/n, 1/n, "+"))[keep]
-# est <- center/(sqrt((MSE) * outer(1/n, 1/n, "+"))[keep])
-# pvals <- pt(abs(est),x$df.residual,lower.tail=FALSE)*2
-# dnames <- list(NULL, c("diff", "lwr", "upr","p adj"))
-# if (!is.null(nms)) dnames[[1L]] <- outer(nms, nms, paste, sep = "-")[keep]
-# out[[nm]] <- array(c(center, center - width, center + width,pvals),
-# c(length(width), 4), dnames)
-# }
-# class(out) <- c("multicomp", "Fisher")
-# attr(out, "orig.call") <- x$call
-# attr(out, "conf.level") <- conf.level
-# attr(out, "fam.level") <- ptukey(sqrt(2)*qt(1-(1-conf.level)/2,x$df.residual),n.means,x$df.residual)
-# attr(out, "ordered") <- ordered
-# attr(out, "data") <- x$model
-# if(!is.balanced()){
-# cat("\nWARNING: Unbalanced data may lead to poor estimates\n")
-# }
-# out
-# }
-
-# #################################################
-# #### Fisher
-# print.Fisher <- function(x, digits=getOption("digits"), ...)
-# {
-# cat("  Fisher multiple comparisons of means\n")
-# cat("    ", format(100*attr(x, "conf.level"), digits=4),
-# "% individual confidence level\n", sep="")
-# cat("    ", format(100*attr(x, "fam.level"), digits=4),
-# "% family-wise confidence level\n", sep="")
-# if (attr(x, "ordered"))
-# cat("    factor levels have been ordered\n")
-
-# cat("\nFit: ", deparse(attr(x, "orig.call"), 500), "\n\n", sep="")
-# xx <- unclass(x)
-# attr(xx, "data") <- attr(xx, "orig.call") <- attr(xx, "fam.level") <- attr(xx, "conf.level") <- attr(xx, "ordered") <- NULL
-# xx[] <- lapply(xx, function(z, digits)
-# {z[, "p adj"] <- round(z[, "p adj"], digits); z},
-# digits=digits)
-# print.default(xx, digits, ...)
-# invisible(x)
-# }
-
-# #################################################
-# #### Fisher
-# plot.Fisher <- function (x, ...)
-# {
-# for (i in seq_along(x)) {
-# xi <- x[[i]][, -4, drop=FALSE] # drop p-values
-# yvals <- nrow(xi):1
-# plot(c(xi[, "lwr"], xi[, "upr"]), rep.int(yvals, 2), type = "n",
-# axes = FALSE, xlab = "", ylab = "", ...)
-# axis(1, ...)
-# axis(2, at = nrow(xi):1, labels = dimnames(xi)[[1L]],
-# srt = 0, ...)
-# abline(h = yvals, lty = 1, lwd = 0.5, col = "lightgray")
-# abline(v = 0, lty = 2, lwd = 0.5, ...)
-# segments(xi[, "lwr"], yvals, xi[, "upr"], yvals, ...)
-# segments(as.vector(xi), rep.int(yvals - 0.1, 3), as.vector(xi),
-# rep.int(yvals + 0.1, 3), ...)
-# title(main = paste(format(100 * attr(x, "fam.level"),
-# 2), "% family-wise confidence level\n", sep = ""),
-# xlab = paste("Differences in mean levels of", names(x)[i]))
-# box()
-# }
-# }
-
-# #################################################
-# #### TukeyHSD
-# TukeyHSD <-
-# function(x, which, ordered = TRUE, conf.level = 0.95, ...)
-# UseMethod("TukeyHSD")
-
-# #################################################
-# #### TukeyHSD
-# TukeyHSD.lm <-
-# function(x, which = seq_along(tabs), ordered = TRUE,
-# conf.level = 0.95, ...)
-# {
-# xc <- x$call
-# x <- aov(x)
-# x$call <- xc
-# mm <- model.tables(x, "means")
-# if(is.null(mm$n))
-# stop("no factors in the fitted model")
-# tabs <- mm$tables[-1L]
-# tabs <- tabs[which]
-# ## mm$n need not be complete -- factors only -- so index by names
-# nn <- mm$n[names(tabs)]
-# nn_na <- is.na(nn)
-# if(all(nn_na))
-# stop("'which' specified no factors")
-# if(any(nn_na)) {
-# warning("'which' specified some non-factors which will be dropped")
-# tabs <- tabs[!nn_na]
-# nn <- nn[!nn_na]
-# }
-# out <- vector("list", length(tabs))
-# names(out) <- names(tabs)
-# MSE <- sum(resid(x)^2, na.rm=TRUE)/x$df.residual
-# for (nm in names(tabs)) {
-# tab <- tabs[[nm]]
-# means <- as.vector(tab)
-# nms <- if(length(d <- dim(tab)) > 1L) {
-# dn <- dimnames(tab)
-# apply(do.call("expand.grid", dn), 1L, paste, collapse=":")
-# } else names(tab)
-# n <- nn[[nm]]
-# ## expand n to the correct length if necessary
-# if (length(n) < length(means)) n <- rep.int(n, length(means))
-# if (as.logical(ordered)) {
-# ord <- order(means)
-# means <- means[ord]
-# n <- n[ord]
-# if (!is.null(nms)) nms <- nms[ord]
-# }
-# center <- outer(means, means, "-")
-# keep <- lower.tri(center)
-# center <- center[keep]
-# width <- qtukey(conf.level, length(means), x$df.residual) *
-# sqrt((MSE/2) * outer(1/n, 1/n, "+"))[keep]
-# est <- center/(sqrt((MSE/2) * outer(1/n, 1/n, "+"))[keep])
-# pvals <- ptukey(abs(est),length(means),x$df.residual,lower.tail=FALSE)
-# dnames <- list(NULL, c("diff", "lwr", "upr","p adj"))
-# if (!is.null(nms)) dnames[[1L]] <- outer(nms, nms, paste, sep = "-")[keep]
-# out[[nm]] <- array(c(center, center - width, center + width,pvals),
-# c(length(width), 4), dnames)
-# }
-# class(out) <- c("multicomp", "TukeyHSD")
-# attr(out, "orig.call") <- x$call
-# attr(out, "conf.level") <- conf.level
-# attr(out, "ordered") <- ordered
-# attr(out, "data") <- x$model
-# out
-# }
-
-# #################################################
-# #### TukeyHSD
-# print.TukeyHSD <- function(x, digits=getOption("digits"), ...)
-# {
-# cat("  Tukey multiple comparisons of means\n")
-# cat("    ", format(100*attr(x, "conf.level"), 2),
-# "% family-wise confidence level\n", sep="")
-# if (attr(x, "ordered"))
-# cat("    factor levels have been ordered\n")
-# cat("\nFit: ", deparse(attr(x, "orig.call"), 500), "\n\n", sep="")
-# xx <- unclass(x)
-# attr(xx, "data") <- attr(xx, "orig.call") <- attr(xx, "conf.level") <- attr(xx, "ordered") <- NULL
-# xx[] <- lapply(xx, function(z, digits)
-# {z[, "p adj"] <- round(z[, "p adj"], digits); z},
-# digits=digits)
-# print.default(xx, digits, ...)
-# invisible(x)
-# }
-
-# #################################################
-# #### TukeyHSD
-# plot.TukeyHSD <- function (x, ...)
-# {
-# for (i in seq_along(x)) {
-# xi <- x[[i]][, -4, drop=FALSE] # drop p-values
-# yvals <- nrow(xi):1
-# dev.hold(); on.exit(dev.flush())
-# plot(c(xi[, "lwr"], xi[, "upr"]), rep.int(yvals, 2), type = "n",
-# axes = FALSE, xlab = "", ylab = "", ...)
-# axis(1, ...)
-# axis(2, at = nrow(xi):1, labels = dimnames(xi)[[1L]],
-# srt = 0, ...)
-# abline(h = yvals, lty = 1, lwd = 0.5, col = "lightgray")
-# abline(v = 0, lty = 2, lwd = 0.5, ...)
-# segments(xi[, "lwr"], yvals, xi[, "upr"], yvals, ...)
-# segments(as.vector(xi), rep.int(yvals - 0.1, 3), as.vector(xi),
-# rep.int(yvals + 0.1, 3), ...)
-# title(main = paste(format(100 * attr(x, "conf.level"),
-# 2), "% family-wise confidence level\n", sep = ""),
-# xlab = paste("Differences in mean levels of", names(x)[i]))
-# box()
-# }
-# }
-
-
-# #################################################
-# #### Compact letter display
-# cld <- function(object, level = 1-attr(object, "conf.level")){
-# N.eff <- length(object)
-# ret   <- list()
-# for(e in 1:N.eff){
-# effect <- names(object[e])
-# cont  <- rownames(object[[e]])
-# cont.split <- strsplit(cont,"-", fixed=TRUE)
-# levs  <- unique(unlist(cont.split))
-# pvals <- object[[e]][,4]
-# data  <- attr(object, "data")
-# means <- sort(tapply(data[[1]],data[,effect],mean))
-# N <- length(means)
-# M <- matrix(0,ncol=N,nrow=N)
-# dimnames(M) <- list(names(means),names(means))
-# for(i in 1:length(cont.split)){
-# M[cont.split[[i]][1],cont.split[[i]][2]] <- pvals[i]
-# }
-# M <- M+t(M)
-# comp <- matrix(FALSE,N,N); diag(comp) <- TRUE
-# for(i in 1:(N-1)){
-# j <- i+1
-# while(j<=N && M[i,j]>level){
-# comp[j,i] <- TRUE
-# j <- j+1
-# }
-# }
-# for(i in 2:N){
-# k <- max(which(comp[,i]))
-# j <- i-1
-# while(j>=1 && M[k,j]>level){
-# comp[j,i] <- TRUE
-# j <- j-1
-# }
-# }
-# comp <- t(unique(t(comp)))
-# dimnames(comp) <- list(names(means),LETTERS[1:dim(comp)[2]])
-# cld <- matrix("",nrow=N,ncol=dim(comp)[2])
-
-# for(i in 1:dim(comp)[2]){
-# cld[comp[,i],i] <- LETTERS[i]
-# }
-# rownames(cld) <- rownames(comp)
-# cld <- data.frame(gr=I(cld),means=means)
-# ret[[effect]] <- list(comp=comp,cld=cld)
-# }
-# class(ret) <- "cld"
-# ret
-# }
-
-# print.cld <- function(x, ...){
-# for(i in 1:length(x))
-# print(x[[i]]$cld)
-# }
-
-
 # Kommenter, flette inn generalTukey med effect
 simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), level = 0.95, ...) {
   if(missing(corr)){
     corr <- "Tukey"
   }
-  mod <- aov(mod)
   random <- ifelse(is.null(mod$random),FALSE,TRUE)
-  if(random){
-    if(corr!="Tukey")
-      stop("Only Tukey correction supported for mixed models.")
+  # mod <- aov(mod)
+  if(random && corr!="Tukey")
+    stop("Only Tukey correction supported for mixed models.")
+  if(corr=="Tukey"){
     if(grepl(":", effect))
-      stop("Only main effects supported for mixed models.")
-    if(effect%in%mod$random$random)
+      stop("Only main effects supported for Tukey.")
+    if(random && effect%in%mod$random$random)
       stop("Only fixed effects supported for mixed models.")
   }
   chkdots <- function(...) {
@@ -1482,10 +1075,8 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     }
   }
   generalTukey <- function(mod,effect,random, ...){
-    if(random){
-      warn <- options("warn")
-      options(warn=-1)
-    }
+    warn <- options("warn")
+    options(warn=-1)
     if(grepl(":", effect)){
       pro  <- sub(":", "*", effect)
       prox <- sub(":", "_", effect)
@@ -1494,25 +1085,28 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
       data <- model.frame(mod)
       eval(parse(text=paste("data$",prox," <- with(data, interaction(", paste(spli,collapse=",",sep=""),", sep=':'))")))
       mod <- update(mod, formula(paste(".~-", pro, "+",prox)), data=data)
+      ret <- list()
       if(random){
-        ret <- list()
         ret$res <- TukeyMix(mod,effect,level)
-        ret$model <- mod
       } else {
-        ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",prox,"='Tukey'))")))
+        ret$res <- TukeyFix(mod,effect,level)
       }
+      ret$model <- mod
     } else {
+      ret <- list()
       if(random){
-        ret <- list()
         ret$res <- TukeyMix(mod,effect,level)
         ret$model <- mod
       } else {
-        ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
+        if(corr == "Tukey"){
+          ret$res <- TukeyFix(mod,effect,level)
+          ret$model <- mod
+        } else {
+          ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
+        }
       }
     }
-    if(random){
-      options(warn=warn$warn)
-    }
+    options(warn=warn$warn)
     ret
   }
   object <- generalTukey(mod,effect,random,...)
@@ -1528,35 +1122,35 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
                    Bonferroni = adjusted_calpha("bonferroni"),
                    Fisher     = univariate_calpha())
   
-  if(random){
+  if(corr == "Tukey"){
     object$test <- 0
   } else {
     ts <- test(object)
     object$test <- ts
   }
   
-  if(random){
+  if(corr == "Tukey"){
     type <- "Tukey"
     object$type <- type
   } else {
     type <- attr(calpha, "type")
   }
   if (is.function(calpha))
-    if(random){
+    if(corr == "Tukey"){
       calpha <- 0
     } else {
       calpha <- calpha(object, level)
     }
   if (!is.numeric(calpha) || length(calpha) != 1)
     stop(sQuote("calpha"), " is not a scalar")
-  if(random){
+  if(corr == "Tukey"){
     error <- attr(object,"error")
   } else{
     error <- attr(calpha, "error")
   }
   attributes(calpha) <- NULL
   
-  if(!random){
+  if(corr != "Tukey"){
     betahat <- coef(object)
     ses <- sqrt(diag(vcov(object)))
     switch(object$alternative, "two.sided" = {
@@ -1589,7 +1183,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
   if(random){
     attr(object, "random") <- TRUE
   }
-  if(random){
+  if(corr == "Tukey"){
     object$focus  <- effect
     class(object) <- "summary.glht"
   } else {
@@ -1618,7 +1212,7 @@ print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), ...) 
   error <- attr(x$confint, "error")
   if (!is.null(error) && error > .Machine$double.eps)
     digits <- min(digits, which.min(abs(1 / error - (10^(1:10)))))
-  if(is.null(attr(x,"random"))){
+  if(attr(x,'type') != "Tukey"){
     cat("Quantile =", round(attr(x$confint, "calpha"), digits))    
   } else {
     cat("Quantile =", round(attr(x$res, "quant"), digits), "\n")
@@ -1634,7 +1228,7 @@ print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), ...) 
   }
   
   ### <FIXME>: compute coefmat in summary.glht for easier access???
-  if(is.null(attr(x,"random"))){
+  if(attr(x,'type') != "Tukey"){
     pq <- x$test
     mtests <- cbind(pq$coefficients, pq$sigma, pq$tstat, pq$pvalues)
     error <- attr(pq$pvalues, "error")
@@ -1666,7 +1260,7 @@ print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), ...) 
   #                 "two.sided" = "==", "less" = ">=", "greater" = "<=")
   ### </FIXME>
   
-  if(is.null(attr(x,"random"))){
+  if(attr(x,'type') != "Tukey"){
     rownames(mtests) <- paste(rownames(mtests), alt, x$rhs)
     rownames(x$confint) <- paste(rownames(x$confint), alt, x$rhs)
     mtests <- cbind(x$confint,mtests[,2:4,drop=FALSE])
@@ -1700,13 +1294,79 @@ TukeyMix <- function(mod, eff, level=0.95){
   effLevs <- sort(levels(effVals))
   weight  <- 2*eval(parse(text=paste("mean(1/xtabs(~",eff,",data=data))",sep="")))
   
-  resp    <- model.response(model.frame(mod))
+  resp    <- model.response(data)
   means   <- tapply(resp,effVals,mean)
   mname   <- names(means)
   df      <- object$denom.df[[eff]]
   error   <- object$errors[match(eff,names(object$denom.df))]
   SE      <- sqrt(error*weight)
-  quant   <- qtukey(level,length(means),df)/sqrt(2)
+  if(df > 1){
+    quant   <- qtukey(level,length(means),df)/sqrt(2)
+  } else {
+    warning('P-values for Tukey\'s HSD is not available for error df=1.')
+    if(length(means) >= 2 & length(means) <= 20 & level %in% c(0.9,0.95,0.975,0.99)){
+      quant <- qtukey1df[paste(length(means)),paste(level)]/sqrt(2)
+    } else {
+      quant <- NaN
+    }
+  }
+  width   <- quant*SE
+  
+  n   <- choose(length(means),2)
+  out <- data.frame(Lower=numeric(n), Diff=numeric(n), Upper=numeric(n), SE=numeric(n), T=numeric(n), 'P(>t)'=numeric(n))
+  rownames(out) <- paste(1:n)
+  k <- 1
+  for(i in 1:(length(means)-1)){
+    for(j in (i+1):length(means)){
+      mij <- means[i]-means[j]
+      p <- ptukey(abs(mij)/(SE/sqrt(2)),length(means),df,lower.tail=FALSE)
+      lower <- mij-width
+      upper <- mij+width
+      out[k,] <- c(lower, mij, upper, SE, mij/SE, p)
+      rownames(out)[k] <- paste(mname[i],'-',mname[j],sep="")
+      k <- k+1
+    }
+  }
+  colnames(out) <- c("Lower", "Center", "Upper", "Std.Err", "t value","P(>t)")
+  attr(out,"minSignDiff") <- width
+  attr(out,"means") <- means
+  attr(out,"level") <- level
+  attr(out,"effVals") <- effVals
+  attr(out,"resp") <- resp
+  attr(out,"quant") <- quant
+  attr(out,"error") <- SE
+  attr(out,"df") <- df
+  class(out) <- c("TukeyMix","data.frame")
+  out
+}
+
+# Internal Tukey calculations for fixed models
+TukeyFix <- function(mod, eff, level=0.95){
+  object <- Anova(mod,type=3)
+  if(!(eff%in%rownames(object)))
+    stop(paste(eff, ' not among model effects', sep=""))
+  data <- model.frame(mod)
+  effVals <- mod$model[[eff]]
+  effLevs <- sort(levels(effVals))
+  weight  <- 2*eval(parse(text=paste("mean(1/xtabs(~",eff,",data=data))",sep="")))
+  
+  resp    <- model.response(data)
+  means   <- tapply(resp,effVals,mean)
+  mname   <- names(means)
+  n       <- dim(object)[1]
+  df      <- object[n,'Df']
+  error   <- object[n,'Sum Sq']/df
+  SE      <- sqrt(error*weight)
+  if(df > 1){
+    quant   <- qtukey(level,length(means),df)/sqrt(2)
+  } else {
+    warning('P-values for Tukey\'s HSD is not available for error df=1.')
+    if(length(means) >= 2 & length(means) <= 20 & level %in% c(0.9,0.95,0.975,0.99)){
+      quant <- qtukey1df[paste(length(means)),paste(level)]/sqrt(2)
+    } else {
+      quant <- NaN
+    }
+  }
   width   <- quant*SE
   
   n   <- choose(length(means),2)
@@ -1742,23 +1402,35 @@ TukeyMix <- function(mod, eff, level=0.95){
 cld.simple.glht <- function (object, alpha = 0.05, decreasing = TRUE, ...) {
   random <- ifelse(is.null(attr(object,'random')),FALSE,TRUE)
   
-  if(!random){
+  if(attr(object,"type") != "Tukey"){
     class(object) <- class(object)[-1]
     ret <- cld(object)
     ret$object <- 0
     means <- sort(tapply(ret$y,ret$x,mean))
-    if(decreasing)
+    if(decreasing){
       means <- rev(means)
+      if(!is.null(dim(ret$mcletters$LetterMatrix))){
+        p <- dim(ret$mcletters$LetterMatrix)[2]
+        ret$mcletters$LetterMatrix <- ret$mcletters$LetterMatrix[,p:1]
+      }
+    }
     attr(ret$object,"means") <- means
     ret$lvl_order <- levels(ret$x)[order(means)]
   } else {
     # Catch failed Tukey
     if(is.nan(attributes(object$res)$quant)){
-	  warning('Tukey\'s HSD failed')
-	  ret <- 0
-	  attr(ret,"failed") <- TRUE
-	  class(ret) <- "cldMix"
-	  return(ret)
+      warning('Tukey\'s HSD failed')
+      ret <- 0
+      attr(ret,"failed") <- TRUE
+      class(ret) <- "cldMix"
+      return(ret)
+    }
+    if(attr(object$res,"df") == 1){
+      ret <- 0
+      attr(ret,"df1") <- TRUE
+      attr(ret,"failed") <- FALSE
+      class(ret) <- "cldMix"
+      return(ret)
     }
     object$test <- list()
     object$test$pvalues <- object$res[,6]
@@ -1766,15 +1438,21 @@ cld.simple.glht <- function (object, alpha = 0.05, decreasing = TRUE, ...) {
     ret <- cld(object)
     ret$object <- 0
     means <- sort(tapply(ret$y,ret$x,mean))
-    if(decreasing)
+    if(decreasing){
       means <- rev(means)
+      if(!is.null(dim(ret$mcletters$LetterMatrix))){
+        p <- dim(ret$mcletters$LetterMatrix)[2]
+        ret$mcletters$LetterMatrix <- ret$mcletters$LetterMatrix[,p:1]
+      }
+    }
     attr(ret$object,"means") <- means
     ret$lvl_order <- levels(ret$x)[order(means)]
     
   }
   class(ret) <- "cldMix"
   attr(ret, "alpha") <- alpha
-	  attr(ret,"failed") <- FALSE
+  attr(ret,"failed") <- FALSE
+  attr(ret,"df1")    <- FALSE
   ret
 }
 
@@ -1782,16 +1460,20 @@ print.cldMix <- function(x, fill=TRUE, ...){
   # Graceful output if failed Tukey
   if(attr(x,"failed")){
     cat("No CLD available\n")
-	return(invisible(NULL))
+    return(invisible(NULL))
   }
-
+  if(attr(x,"df1")){
+    cat("No CLD available for single df error.\n")
+    return(invisible(NULL))
+  }
+  
   object    <- x
   means     <- attr(object$object,"means")
   n         <- length(means)
   mname     <- names(means)
   letters   <- object$mcletters$LetterMatrix
   if(is.null(dim(letters))){
-	lvl_order <- names(letters)
+    lvl_order <- names(letters)
   } else {
     lvl_order <- rownames(letters) #object$lvl_order
   }

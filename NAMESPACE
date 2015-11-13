@@ -1,12 +1,9 @@
-# import(stats, car, lme4, multcomp, MASS, pls)
-importFrom(leaps, regsubsets)
-# import(pls)
 import(lme4)
 import(car)
-importFrom(pls,plsr)
-importFrom(multcomp,glht)
-importFrom(multcomp,cld)
+importFrom(pls,RMSEP)
+import(multcomp)
 importFrom(pracma,rref)
+importFrom(leaps, regsubsets)
 importFrom("graphics", "axis", "box", "mtext", "par", "plot", "points")
 importFrom("stats", ".getXlevels", "add1", "anova", "aov",
            "as.formula", "coef", "complete.cases", "cov", "drop.scope",
@@ -23,6 +20,7 @@ export(
     AnovaMix,
     backward,
     best.subsets,
+    cld,
     confusion,
 #    ConjComp,
 	  CIgrandMean,

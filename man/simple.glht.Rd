@@ -3,6 +3,7 @@
 \name{simple.glht}
 \alias{simple.glht}
 \alias{print.simple.glht}
+\alias{cld}
 \title{
 Pairwise comparison with multiple testing compensation.
 }
@@ -73,7 +74,7 @@ simple.glht(mod, effect, corr = c("Tukey","Bonferroni","Fisher"),
   Chapman & Hall.
 }
 \author{
-  Douglas Bates
+  Douglas Bates, extended to mixed effect models by Kristian Hovde Liland.
 }
 \seealso{
   \code{\link{aov}}, \code{\link{qtukey}}, \code{\link{model.tables}},
