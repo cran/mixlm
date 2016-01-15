@@ -413,7 +413,9 @@ RMSEP <- function(object){
   }
   the.RMSEP
 }
-
+rmsep <- function(object){
+  mixlm::RMSEP(object)
+}
 
 ################################
 # One sample proportion test

@@ -49,6 +49,7 @@ export(
 #    responseName,
 #    responseName.default,
     RMSEP,
+    rmsep,
     rparse,
     simple.glht,
     spearson,
