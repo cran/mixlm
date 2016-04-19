@@ -1101,9 +1101,10 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
         ret$model <- mod
       } else {
         if(corr == "Tukey"){
-          ret$res <- TukeyFix(mod,effect,level)
+          # ret$res <- TukeyFix(mod,effect,level)
+          ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
           ret$model <- mod
-        } else {
+        } else { # This will be overwritten.
           ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
         }
       }
@@ -1124,14 +1125,14 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
                    Bonferroni = adjusted_calpha("bonferroni"),
                    Fisher     = univariate_calpha())
   
-  if(corr == "Tukey"){
+  if(corr == "Tukey" && random){
     object$test <- 0
   } else {
     ts <- test(object)
     object$test <- ts
   }
   
-  if(corr == "Tukey"){
+  if(corr == "Tukey" && random){
     type <- "Tukey"
     object$type <- type
   } else {
@@ -1145,14 +1146,14 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     }
   if (!is.numeric(calpha) || length(calpha) != 1)
     stop(sQuote("calpha"), " is not a scalar")
-  if(corr == "Tukey"){
+  if(corr == "Tukey" && random){
     error <- attr(object,"error")
   } else{
     error <- attr(calpha, "error")
   }
   attributes(calpha) <- NULL
   
-  if(corr != "Tukey"){
+  if(corr != "Tukey" || !random){
     betahat <- coef(object)
     ses <- sqrt(diag(vcov(object)))
     switch(object$alternative, "two.sided" = {
@@ -1218,7 +1219,8 @@ print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), ...) 
     cat("Quantile =", round(attr(x$confint, "calpha"), digits))    
   } else {
     cat("Quantile =", round(attr(x$res, "quant"), digits), "\n")
-    cat("Minimum significant difference =", round(attr(x$res,"minSignDiff"),digits))
+    if(length(attr(x$res,"minSignDiff"))>0)
+      cat("Minimum significant difference =", round(attr(x$res,"minSignDiff"),digits))
   }
   cat("\n")
   if (attr(x, "type") == "adjusted") {
