@@ -1139,7 +1139,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     type <- attr(calpha, "type")
   }
   if (is.function(calpha))
-    if(corr == "Tukey"){
+    if(corr == "Tukey" && random){
       calpha <- 0
     } else {
       calpha <- calpha(object, level)
@@ -1166,7 +1166,6 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
       LowerCL <- betahat + calpha * ses
       UpperCL <- rep( Inf, length(ses))
     })
-    
     ci <- cbind(LowerCL, UpperCL)
     colnames(ci) <- c("lower", "upper")
     object$confint <- cbind(betahat, ci)
