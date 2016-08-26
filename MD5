@@ -1,4 +1,4 @@
-6360ea76ebdeade415592129008a2f6f *DESCRIPTION
+e546fe5e886d4a9c7330ad52333cdfa8 *DESCRIPTION
 75c83f75934a65ac79ff00e8c42f7f63 *NAMESPACE
 9c4e1d3e756d106a47cb3b67f43bd423 *NEWS
 0c1911d6cf431038855eef8ef70f4300 *R/borrowed.R
@@ -6,7 +6,7 @@
 806c5d72f0f9b33c03c3cd41ececea46 *R/globals.R
 2444a87149bfb80339fdf75c2fdc57a6 *R/lm.R
 de62d2f8b129ebfd8f2bf5116bb724a7 *R/mixlm.R
-c4be7dca126c156c1aa17bd5139f97b1 *R/statistics.R
+f1c412bbe2024d06b5cbc31d1d9bb87b *R/statistics.R
 8b4ac4a93963af4c9e95603c38b70025 *R/utilities.R
 3ec2c9dd16541f49378f4a4757e1204b *man/Anova.Rd
 e71484a94ea5f8be22849b7ac6d1491d *man/AnovaMix.Rd

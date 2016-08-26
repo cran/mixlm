@@ -1101,9 +1101,11 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
         ret$model <- mod
       } else {
         if(corr == "Tukey"){
-          # ret$res <- TukeyFix(mod,effect,level)
-          ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
+          ret$res <- TukeyFix(mod,effect,level)
           ret$model <- mod
+          # ret$res <- TukeyFix(mod,effect,level)
+          # ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
+          # ret$model <- mod
         } else { # This will be overwritten.
           ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
         }
@@ -1124,22 +1126,22 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
                    Tukey      = adjusted_calpha(),
                    Bonferroni = adjusted_calpha("bonferroni"),
                    Fisher     = univariate_calpha())
-  
-  if(corr == "Tukey" && random){
+ 
+  if(corr == "Tukey"){
     object$test <- 0
   } else {
     ts <- test(object)
     object$test <- ts
   }
   
-  if(corr == "Tukey" && random){
+  if(corr == "Tukey"){
     type <- "Tukey"
     object$type <- type
   } else {
     type <- attr(calpha, "type")
   }
   if (is.function(calpha))
-    if(corr == "Tukey" && random){
+    if(corr == "Tukey"){
       calpha <- 0
     } else {
       calpha <- calpha(object, level)
@@ -1153,7 +1155,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
   }
   attributes(calpha) <- NULL
   
-  if(corr != "Tukey" || !random){
+  if(corr != "Tukey"){
     betahat <- coef(object)
     ses <- sqrt(diag(vcov(object)))
     switch(object$alternative, "two.sided" = {
