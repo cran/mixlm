@@ -1062,9 +1062,11 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
   # mod <- aov(mod)
   if(random && corr!="Tukey")
     stop("Only Tukey correction supported for mixed models.")
+  # if(corr!="Tukey"){
+  #   if(grepl(":", effect))
+  #     stop("Only main effects supported for Tukey.")
+  # }
   if(corr=="Tukey"){
-    if(grepl(":", effect))
-      stop("Only main effects supported for Tukey.")
     if(random && effect%in%mod$random$random)
       stop("Only fixed effects supported for mixed models.")
   }
@@ -1089,9 +1091,13 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
       mod <- update(mod, formula(paste(".~-", pro, "+",prox)), data=data)
       ret <- list()
       if(random){
-        ret$res <- TukeyMix(mod,effect,level)
+        ret$res <- TukeyMix(mod,prox,level)
       } else {
-        ret$res <- TukeyFix(mod,effect,level)
+        if(corr == "Tukey"){
+          ret$res <- TukeyFix(mod,prox,level)
+        } else {
+          ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",prox,"='Tukey'),...)")))
+        }
       }
       ret$model <- mod
     } else {
@@ -1103,9 +1109,6 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
         if(corr == "Tukey"){
           ret$res <- TukeyFix(mod,effect,level)
           ret$model <- mod
-          # ret$res <- TukeyFix(mod,effect,level)
-          # ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
-          # ret$model <- mod
         } else { # This will be overwritten.
           ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
         }
@@ -1115,7 +1118,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     ret
   }
   object <- generalTukey(mod,effect,random,...)
-  
+
   chkdots(...)
   
   test <- switch(corr,
@@ -1144,6 +1147,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     if(corr == "Tukey"){
       calpha <- 0
     } else {
+      browser()
       calpha <- calpha(object, level)
     }
   if (!is.numeric(calpha) || length(calpha) != 1)
@@ -1188,7 +1192,11 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     attr(object, "random") <- TRUE
   }
   if(corr == "Tukey"){
-    object$focus  <- effect
+    if(grepl(":", effect)){
+      object$focus <- sub(":", "_", effect)
+    } else{
+      object$focus  <- effect
+    }
     class(object) <- "summary.glht"
   } else {
     class(object) <- switch(class(ts), "mtest" = "summary.glht",
