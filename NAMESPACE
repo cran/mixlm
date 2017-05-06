@@ -1,4 +1,3 @@
-import(lme4)
 import(car)
 importFrom(pls,RMSEP)
 import(multcomp)

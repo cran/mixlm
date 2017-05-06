@@ -332,10 +332,12 @@ summary(glm(lot2 ~ log(u), data=clotting, family=Gamma))
 
 # Mixed model example
 dataset   <- data.frame(y=rnorm(8), x=factor(c(rep(1,4),rep(0,4))), z=factor(rep(c(1,0),4)))
-GLM       <- glm(y  ~ x+r(z), family=gaussian(identity), data=dataset)
-summary(GLM)
-logLik(GLM)
-Anova(GLM,type=3)
+if(require(lme4)){
+  GLM       <- glm(y  ~ x+r(z), family=gaussian(identity), data=dataset)
+  summary(GLM)
+  logLik(GLM)
+  Anova(GLM,type=3)
+}
 
 \dontrun{
 ## for an example of the use of a terms object as a formula

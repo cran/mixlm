@@ -33,19 +33,23 @@ glm <- function(formula, family = gaussian, data, weights,
       rw <- list(0)
     }
     if(length(rw) != 1){  # Removed r() from formula
-      formula <- rw$formula
-      mf$formula <- rw$formula
-      if(!is.logical(REML)){ # Perform 
-        REML <- TRUE
-        warning("REML must be logical")
-      }
-      if(family$family == "gaussian" && family$link =="identity"){
-        object <- lme4::lmer(rw$reml.formula, data, REML = REML, contrasts = contrasts, na.action = na.action, ...)
+      if(requireNamespace("lme4", quietly = TRUE)){
+        formula <- rw$formula
+        mf$formula <- rw$formula
+        if(!is.logical(REML)){ # Perform 
+          REML <- TRUE
+          warning("REML must be logical")
+        }
+        if(family$family == "gaussian" && family$link =="identity"){
+          object <- lme4::lmer(rw$reml.formula, data, REML = REML, contrasts = contrasts, na.action = na.action, ...)
+        } else {
+          object <- lme4::glmer(rw$reml.formula, data, family = family, contrasts = contrasts, na.action = na.action, ...)
+        }
+        object@call <- call
+        return(object)
       } else {
-        object <- lme4::glmer(rw$reml.formula, data, family = family, contrasts = contrasts, na.action = na.action, ...)
+        warning('Package lme4 required for random glm')
       }
-      object@call <- call
-      return(object)
     }
   }
   ## End of edit

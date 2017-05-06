@@ -1082,9 +1082,9 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     warn <- options("warn")
     options(warn=-1)
     if(grepl(":", effect)){
-      pro  <- sub(":", "*", effect)
-      prox <- sub(":", "_", effect)
-      cola <- sub(":", "",  effect)
+      pro  <- gsub(":", "*", effect)
+      prox <- gsub(":", "_", effect)
+      cola <- gsub(":", "",  effect)
       spli <- unlist(strsplit(effect,":"))
       data <- model.frame(mod)
       eval(parse(text=paste("data$",prox," <- with(data, interaction(", paste(spli,collapse=",",sep=""),", sep=':'))")))
@@ -1193,7 +1193,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
   }
   if(corr == "Tukey"){
     if(grepl(":", effect)){
-      object$focus <- sub(":", "_", effect)
+      object$focus <- gsub(":", "_", effect)
     } else{
       object$focus  <- effect
     }

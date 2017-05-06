@@ -234,7 +234,11 @@ print.AnovaMix <- function(x,...){
 
 # lm from stats, edited to use treatment names in sum contrasts
 # and enable limited classical least squares mixed models
-lmer <- lme4::lmer
+if(requireNamespace("lme4", quietly = TRUE)){
+  lmer <- lme4::lmer
+} else {
+  lmer <- function()warning("Install package lme4 to enable REML/ML modelling.")
+}
 lm <- function (formula, data, subset, weights, na.action,
                 method = "qr", model = TRUE, x = FALSE, y = FALSE,
                 qr = TRUE, singular.ok = TRUE, contrasts = NULL,
@@ -260,11 +264,15 @@ lm <- function (formula, data, subset, weights, na.action,
       mf$formula <- rw$formula
       rw$unrestricted <- unrestricted
       if(is.logical(REML)){ # Perform 
-        cl[[1]] <- as.name("lmer")
-        cl[["formula"]] <- rw$reml.formula
-        object <- eval(cl,parent.frame())
-        object@call <- cl
-        return(object)
+        if(requireNamespace("lme4", quietly = TRUE)){
+          cl[[1]] <- as.name("lmer")
+          cl[["formula"]] <- rw$reml.formula
+          object <- eval(cl,parent.frame())
+          object@call <- cl
+          return(object)
+        } else {
+          warning('Package lme4 required for random REML/ML models.')
+        }
       }
     }
   } else {
