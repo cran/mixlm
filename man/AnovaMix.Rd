@@ -40,10 +40,11 @@ Only balanced models are fully supported.
 \code{\link{print.AnovaMix}}, \code{\link{Anova}}, \code{\link{lm}}
 }
 \examples{
+mydata <- data.frame(y = rnorm(12),
+							  x = factor(c(rep(2,4),rep(1,4),rep(0,4))),
+							  z = factor(rep(c(1,0),6)))
 mixlm <- lm(y~x*r(z),
-			data = data.frame(y = rnorm(8),
-							  x = factor(c(rep(1,4),rep(0,4))),
-							  z = factor(rep(c(1,0),4))))
+			data = mydata)
 Anova(mixlm,type="III")
 }
 \keyword{ ANOVA }

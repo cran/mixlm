@@ -208,6 +208,64 @@ forward <- function(model, alpha=0.2, full=FALSE, force.in=NULL){
   return(current.model)
 }
 
+##################################
+# Forward selection for wide matrices
+wideForward <- function(formula, data, alpha = 0.2, force.in = NULL){
+  # Initialization
+  cl <- match.call()
+  mf <- match.call(expand.dots = FALSE)
+  m <- match(c("formula", "data", "alpha", "force.in"), names(mf), 0L)
+  mf <- mf[c(1L, m)]
+  mf$drop.unused.levels <- TRUE
+  mf[[1L]] <- quote(stats::model.frame)
+  mf <- eval(mf, parent.frame())
+  p <- ncol(mf)-1
+  N <- nrow(mf)
+  varLeft     <- colnames(mf)[-1]
+  varIncluded <- character()
+  # Prepare formulae
+  formulaIncluded <- update(formula, ~ 1)
+  if(!is.null(force.in)){
+    for(i in 1:length(force.in)){
+      formulaIncluded <- update(formulaIncluded, paste('. ~ .+', force.in[i] ) )
+    }
+  }
+  modPre <- lm(formulaIncluded, data = data)
+  pInclusion <- numeric()
+  for(i in 1:min(N-1,p)){ # Maximum number of includable variables
+    pThis <- numeric(length(varLeft))
+    names(pThis) <- varLeft
+    for(varThis in varLeft){ # Loop over remaining variables
+      varCurrent  <- c(varIncluded, varThis)
+      currFormula <- update(formulaIncluded, paste('. ~ . +', varThis ))
+      mod <- lm(currFormula, data = data)
+      pThis[varThis] <- anova(modPre, mod)$`Pr(>F)`[2]
+    }
+    pInclusion <- c(pInclusion, min(pThis))
+    if(length(pThis) > 1 && any(!is.na(pThis) & pThis < alpha)){ # Add best variable to model if any below alpha
+      varIncluded <- c(varIncluded, names(which.min(pThis)))
+      varLeft     <- setdiff(varLeft, names(which.min(pThis)))
+      formulaIncluded <- update(formulaIncluded, paste('. ~ .+', names(which.min(pThis)) ) )
+      names(pInclusion)[length(pInclusion)] <- names(which.min(pThis))
+      modPre <- lm(formulaIncluded, data = data)
+    } else {
+      names(pInclusion)[length(pInclusion)] <- paste("(",names(which.min(pThis)), ")", sep="")
+      break()
+    }
+  }
+  # Final model
+  # mod <- lm(formulaIncluded, data = data)
+  object <- list(model = modPre, p.values = pInclusion)
+  class(object) <- c("WF", "list")
+  return(object)
+}
+print.WF <- function(x, ...){
+  cat("\nSelected P-value sequence\n")
+  print(x$p.values)
+  cat("\nFinal model\n")
+  print(summary(x$model))
+}
+
 
 ##################################
 # Backward elimination
@@ -1054,7 +1112,7 @@ tally <- function(x){
 
 
 # Kommenter, flette inn generalTukey med effect
-simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), level = 0.95, ...) {
+simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), level = 0.95, df = NULL, ...) {
   if(missing(corr)){
     corr <- "Tukey"
   }
@@ -1078,7 +1136,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
               " are ignored", call. = TRUE)
     }
   }
-  generalTukey <- function(mod,effect,random, ...){
+  generalTukey <- function(mod,effect,random,df, ...){
     warn <- options("warn")
     options(warn=-1)
     if(grepl(":", effect)){
@@ -1088,13 +1146,33 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
       spli <- unlist(strsplit(effect,":"))
       data <- model.frame(mod)
       eval(parse(text=paste("data$",prox," <- with(data, interaction(", paste(spli,collapse=",",sep=""),", sep=':'))")))
-      mod <- update(mod, formula(paste(".~-", pro, "+",prox)), data=data)
+      ##
+      form <- paste(".~.-", pro, "+", prox)
+      if(random){ # Remove chosen interaction while keeping all else
+        for(i in 1:length(mod$random$allr)){
+          if(sum(spli %in% (splii <- unlist(strsplit(mod$random$allr[i],':')))) == length(spli) &&
+             length(diffs <- setdiff(splii,spli))>0){
+            form <- paste(form, "-", mod$random$allr[i], "+", paste(prox,diffs,sep=':'))
+          }
+        }
+        mod <- update(mod, update(mod$random$rformula,form), data=data)
+      } else {
+        ueff <- unique(mod$effect.sources)
+        for(i in 1:length(ueff)){
+          if(sum(spli %in% (splii <- unlist(strsplit(ueff[i],':')))) == length(spli) &&
+             length(diffs <- setdiff(splii,spli))>0){
+            form <- paste(form, "-", ueff[i], "+", paste(prox,diffs,sep=':'))
+          }
+        }
+        mod <- update(mod, update(formula(mod),form), data=data)
+      }
+      # mod <- update(mod, formula(paste(".~.-", pro, "+",prox)), data=data)
       ret <- list()
       if(random){
-        ret$res <- TukeyMix(mod,prox,level)
+        ret$res <- TukeyMix(mod,prox,level,df)
       } else {
         if(corr == "Tukey"){
-          ret$res <- TukeyFix(mod,prox,level)
+          ret$res <- TukeyFix(mod,prox,level,df)
         } else {
           ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",prox,"='Tukey'),...)")))
         }
@@ -1103,11 +1181,11 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     } else {
       ret <- list()
       if(random){
-        ret$res <- TukeyMix(mod,effect,level)
+        ret$res <- TukeyMix(mod,effect,level,df)
         ret$model <- mod
       } else {
         if(corr == "Tukey"){
-          ret$res <- TukeyFix(mod,effect,level)
+          ret$res <- TukeyFix(mod,effect,level,df)
           ret$model <- mod
         } else { # This will be overwritten.
           ret <- eval(parse(text=paste("glht(mod, linfct=mcp(",effect,"='Tukey'),...)")))
@@ -1117,7 +1195,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     options(warn=warn$warn)
     ret
   }
-  object <- generalTukey(mod,effect,random,...)
+  object <- generalTukey(mod,effect,random,df,...)
 
   chkdots(...)
   
@@ -1147,7 +1225,6 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     if(corr == "Tukey"){
       calpha <- 0
     } else {
-      browser()
       calpha <- calpha(object, level)
     }
   if (!is.numeric(calpha) || length(calpha) != 1)
@@ -1180,7 +1257,7 @@ simple.glht <- function(mod, effect, corr = c("Tukey","Bonferroni","Fisher"), le
     attr(object$confint, "calpha") <- calpha
     attr(object$confint, "error") <- error
   } else {
-    object$confint <- object$res[,c(2,1,3)]
+    object$confint <- as.matrix(object$res[,c(2,1,3)])
     colnames(object$confint) <- c("Estimate","lwr","upr")
     attr(object$confint, "conf.level") <- level
   }
@@ -1296,7 +1373,7 @@ print.simple.glht <- function(x, digits = max(3, getOption("digits") - 3), ...) 
 }
 
 # Internal Tukey calculations for mixed models
-TukeyMix <- function(mod, eff, level=0.95){
+TukeyMix <- function(mod, eff, level=0.95, df = NULL){
   object <- Anova(mod,type=3)
   if(!(eff%in%rownames(object$anova)))
     stop(paste(eff, ' not among model effects', sep=""))
@@ -1310,7 +1387,9 @@ TukeyMix <- function(mod, eff, level=0.95){
   resp    <- model.response(data)
   means   <- tapply(resp,effVals,mean)
   mname   <- names(means)
-  df      <- object$denom.df[[eff]]
+  if(is.null(df)){
+    df      <- object$denom.df[[eff]]
+  }
   error   <- object$errors[match(eff,names(object$denom.df))]
   SE      <- sqrt(error*weight)
   if(df > 1){
@@ -1336,7 +1415,7 @@ TukeyMix <- function(mod, eff, level=0.95){
       lower <- mij-width
       upper <- mij+width
       out[k,] <- c(lower, mij, upper, SE, mij/SE, p)
-      rownames(out)[k] <- paste(mname[i],'-',mname[j],sep="")
+      rownames(out)[k] <- paste(mname[i],' - ',mname[j],sep="")
       k <- k+1
     }
   }
@@ -1354,7 +1433,7 @@ TukeyMix <- function(mod, eff, level=0.95){
 }
 
 # Internal Tukey calculations for fixed models
-TukeyFix <- function(mod, eff, level=0.95){
+TukeyFix <- function(mod, eff, level=0.95, df=NULL){
   object <- Anova(mod,type=3)
   if(!(eff%in%rownames(object)))
     stop(paste(eff, ' not among model effects', sep=""))
@@ -1367,8 +1446,10 @@ TukeyFix <- function(mod, eff, level=0.95){
   means   <- tapply(resp,effVals,mean)
   mname   <- names(means)
   n       <- dim(object)[1]
-  df      <- object[n,'Df']
-  error   <- object[n,'Sum Sq']/df
+  if(is.null(df)){
+    df      <- object[n,'Df']
+  }
+  error   <- object[n,'Sum Sq']/object[n,'Df']
   SE      <- sqrt(error*weight)
   if(df > 1){
     quant   <- qtukey(level,length(means),df)/sqrt(2)

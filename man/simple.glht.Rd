@@ -19,7 +19,7 @@ Pairwise comparison with multiple testing compensation.
 }
 \usage{
 simple.glht(mod, effect, corr = c("Tukey","Bonferroni","Fisher"),
-	level = 0.95, \dots)
+	level = 0.95, df = NULL, \dots)
 }
 \arguments{
  \item{mod}{A fitted model object, usually an \code{\link{lm}} or \code{\link{glm}} fit.}
@@ -29,6 +29,8 @@ simple.glht(mod, effect, corr = c("Tukey","Bonferroni","Fisher"),
   method. Defaults to \code{Tukey}.}
  \item{level}{A numeric value between zero and one giving the
    family-wise confidence level to use.}
+ \item{df}{User supplied number of degrees of freedom. If not supplied or
+   NULL, the default is to extract these from the model.}
  \item{\dots}{Optional additional arguments.  None are used at present.}
 }
 \details{

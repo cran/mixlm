@@ -38,6 +38,7 @@ export(
   	print.CIgm,
     print.simple.glht,
     print.summary.lmm,
+    print.WF,
     prop.test.ordinary,
     qr.lmm,
     R2pred,
@@ -62,6 +63,7 @@ export(
     tally,
 #    term.names,
 #    term.names.default,
+    wideForward,
     z_test,
     z_test.default,
     z_test.formula,
@@ -84,3 +86,4 @@ S3method(z_test, formula)
 S3method(print, AnovaMix)
 S3method(print, CIgm)
 S3method(print, simple.glht)
+S3method(print, WF)
