@@ -259,7 +259,7 @@ if(requireNamespace("lme4", quietly = TRUE)){
 lm <- function (formula, data, subset, weights, na.action,
                 method = "qr", model = TRUE, x = TRUE, y = TRUE,
                 qr = TRUE, singular.ok = TRUE, contrasts = "contr.sum",
-                offset, unrestricted = TRUE, REML = NULL, ...)
+                offset, unrestricted = TRUE, REML = NULL, equal_baseline=FALSE, ...)
 {
   ret.x <- x
   ret.y <- y
@@ -302,17 +302,17 @@ lm <- function (formula, data, subset, weights, na.action,
   mf$drop.unused.levels <- TRUE
   mf[[1L]] <- as.name("model.frame")
   mf <- eval(mf, parent.frame())
-  if (method == "model.frame")
-    return(mf)
-  else if (method != "qr")
-    warning(gettextf("method = '%s' is not supported. Using 'qr'", method),
+  if (method != "model.frame")
+    if (method != "qr")
+      warning(gettextf("method = '%s' is not supported. Using 'qr'", method),
             domain = NA)
   mt <- attr(mf, "terms") # allow model.frame to update it
   y <- model.response(mf, "numeric")
-  # Create contrast list if single character argument is supplied to contrasts
+  # Create contrast list if single character argument is supplied to contrasts (edit by KHL)
   contrasts.orig <- contrasts
   if(!is.null(contrasts)){
     if(is.character(contrasts) && length(contrasts)==1){
+      # Handle contrasts given as a single string
       facs <- which(unlist(lapply(mf, inherits, what = "factor")))
       if(contrasts == "contr.treatment.last"){ # Force last level of factor to base level
         contrasts <- lapply(mf[names(facs)], function(f){nl <- nlevels(f); contr.treatment(nl,nl)})
@@ -324,7 +324,69 @@ lm <- function (formula, data, subset, weights, na.action,
           names(contrasts) <- names(facs)
         }
     }
+    # Handle contrasts given as lists
+    if(is.list(contrasts) && length(contrasts) > 1){
+      facs <- which(unlist(lapply(mf, inherits, what = "factor")))
+      if(length(facs) != length(contrasts))
+        stop("Number of contrasts must match number of factors when specified separately")
+      for(i in 1:length(contrasts)){
+        if(!is.matrix(contrasts[[i]])){
+          nl <- nlevels(mf[[names(contrasts)[i]]])
+          if(contrasts[[i]] == "contr.treatment.last"){ # Force last level of factor to base level
+            contrasts[[i]] <- contr.treatment(nl,nl)
+          } else
+            if(contrasts[[i]] == "contr.weighted")
+              contrasts[[i]] <- contr.weighted(mf[[names(contrasts)[i]]])
+            else {
+              if(contrasts[[i]] == "contr.treatment")
+                contrasts[[i]] <- contr.treatment(nl)
+              else {
+                if(contrasts[[i]] == "contr.sum")
+                  contrasts[[i]] <- contr.sum(nl)
+                else {
+                  if(contrasts[[i]] == "contr.poly")
+                    contrasts[[i]] <- contr.poly(nl)
+                  else {
+                    if(contrasts[[i]] == "contr.SAS")
+                      contrasts[[i]] <- contr.SAS(nl)
+                    else {
+                      if(contrasts[[i]] == "contr.helmert")
+                        contrasts[[i]] <- contr.helmert(nl)
+                    }
+                  }
+                }
+              }
+            }
+        }
+      }
+    }
   }
+  ## Expand model.frame and adapt formula if necessary for missing main effects
+  if(equal_baseline){
+    eformula <- .extend_formula(formula)
+    # Check that there are interactions and all included interaction variables are factors
+    if(!is.null(eformula$interactions) && all(unlist(lapply(mf[eformula$variables], inherits, what="factor")))){
+      # Expand mf
+      for(i in 1:length(eformula$interactions)){
+        mf[ncol(mf)+1] <- interaction(mf[strsplit(eformula$interactions[i],":")[[1]]])
+      }
+      colnames(mf)[(ncol(mf)-length(eformula$interactions)+1):ncol(mf)] <- eformula$interactions
+      # Adapt formula
+      for(i in 1:length(eformula$interactions)){
+        formula <- formula(gsub(eformula$interactions[[i]], paste0("`",eformula$interactions[[i]],"`"),as.character(formula)))
+      }
+      mt <- terms(formula)
+      for(i in 1:length(eformula$interactions)){
+        contrasts[[length(contrasts)+1]] <- .krons(contrasts[strsplit(eformula$interactions[[i]],":")[[1]]])
+        names(contrasts)[length(contrasts)] <- eformula$interactions[[i]]
+      }
+      contrasts <- contrasts[setdiff(names(contrasts), eformula$missing)]
+    } else {
+      stop("'equal_baseline' should only be used with interactions, and all interaction-variables should be factors.")
+    }
+  }
+  if (method == "model.frame")
+    return(mf)
   ## avoid any problems with 1D or nx1 arrays by as.vector.
   w <- as.vector(model.weights(mf))
   if(!is.null(w) && !is.numeric(w))
@@ -350,34 +412,51 @@ lm <- function (formula, data, subset, weights, na.action,
     }
   }
   else {
-    x <- model.matrix(mt, mf, contrasts)
+    # Alternative handling of missing main effects in model.matrix
+    # if(!identical(eobj <- .extend_formula(formula), formula)){
+    #   eformula <- eobj$eformula
+    #   efactors <- eobj$missing
+    #   mte <- terms(eformula)
+    #   xe <- model.matrix(object=mte, data=mf, contrasts.arg=contrasts)
+    #   eeffect.sources <- effect.source(mte,mf)
+    #   effect.sources <- setdiff(eeffect.sources, efactors)
+    #   x <- xe[, match(effect.sources, eeffect.sources)]
+    #   browser()
+    # } else {
+    x <- model.matrix(object=mt, data=mf, contrasts.arg=contrasts)
     effect.sources <- effect.source(mt,mf)
-    ## Edited by KHL CCS = Cell Count Scaling
+    # }
+    ## Edited by KHL (CCS = Cell Count Scaling)
+    col.names   <- effect.labels(mt,mf,contrasts) # mt is "terms" from formula, x is model.matrix
+    if(length(col.names)==length(colnames(x))){
+      colnames(x) <- col.names
+      # effect.sources <- effect.source(mt,mf)
+    }
     if((is.null(contrasts.orig) && options("contrasts")[[1]][1] %in% c("contr.sum", "contr.weighted")) ||
        (is.list(contrasts.orig) && all(unlist(contrasts.orig) %in% c("contr.sum", "contr.weighted"))) ||
        (is.character(contrasts.orig) && contrasts.orig %in% c("contr.sum", "contr.weighted"))){
       #    if((is.list(contrasts) || is.null(contrasts)) && (options("contrasts")[[1]][1] %in% c("contr.sum", "contr.weighted")) && !missing(data)){ #  || options("contrasts")[[1]][1]!="contr.poly"
-      col.names   <- effect.labels(mt,mf) # mt is "terms" from formula, x is model.matrix
-      if(length(col.names)==length(colnames(x))){
-        colnames(x) <- col.names
-        # effect.sources <- effect.source(mt,mf)
-      }
-#      # Special handling of interactions for ccs coding
-#      if((is.null(contrasts.orig) && options("contrasts")[[1]][1] %in% c("contr.sum_ccs")) ||
-#         (is.list(contrasts.orig) && all(unlist(contrasts.orig) %in% c("contr.sum_ccs"))) ||
-#         (is.character(contrasts.orig) && contrasts.orig %in% c("contr.sum_ccs"))){   
-#        int <- interaction(mf[unlist(lapply(mf,class))=="factor"])
-#        nlev <- nlevels(int)
-#        tint <- table(int)
-#        N <- round(median(tint))
-#        #levels(int) <- sqrt(N/tint)
-#        wgt <- rep(1, nrow(x))
-#        for(i in 1:nlevels(int)){
-#          wgt[int==levels(int)[i]] <- sqrt(N/tint[i])
-#        }
-#        x <- x*wgt
-#        ccs <- TRUE
-#      }
+      # col.names   <- effect.labels(mt,mf,contrasts) # mt is "terms" from formula, x is model.matrix
+      # if(length(col.names)==length(colnames(x))){
+      #   colnames(x) <- col.names
+      #   # effect.sources <- effect.source(mt,mf)
+      # }
+      #      # Special handling of interactions for ccs coding
+      #      if((is.null(contrasts.orig) && options("contrasts")[[1]][1] %in% c("contr.sum_ccs")) ||
+      #         (is.list(contrasts.orig) && all(unlist(contrasts.orig) %in% c("contr.sum_ccs"))) ||
+      #         (is.character(contrasts.orig) && contrasts.orig %in% c("contr.sum_ccs"))){   
+      #        int <- interaction(mf[unlist(lapply(mf,class))=="factor"])
+      #        nlev <- nlevels(int)
+      #        tint <- table(int)
+      #        N <- round(median(tint))
+      #        #levels(int) <- sqrt(N/tint)
+      #        wgt <- rep(1, nrow(x))
+      #        for(i in 1:nlevels(int)){
+      #          wgt[int==levels(int)[i]] <- sqrt(N/tint[i])
+      #        }
+      #        x <- x*wgt
+      #        ccs <- TRUE
+      #      }
       # Special handling of interactions for weighted coding
       if((is.null(contrasts.orig) && options("contrasts")[[1]][1] %in% c("contr.weighted")) ||
          (is.list(contrasts.orig) && all(unlist(contrasts.orig) %in% c("contr.weighted"))) ||
@@ -437,8 +516,8 @@ lm <- function (formula, data, subset, weights, na.action,
   }
   if(exists("effect.sources") && !is.null(effect.sources))
     z$effect.sources <- effect.sources
-#  if(ccs) # Save contr.sum_ccs weights
-#    z$ccs <- wgt
+  #  if(ccs) # Save contr.sum_ccs weights
+  #    z$ccs <- wgt
   ## End edit
   z
 }
